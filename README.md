@@ -129,7 +129,11 @@ This plugin is the **backbone** of a production system serving thousands of dail
 ```bash
 # 1. Clone the repository into your WordPress plugins directory
 cd wp-content/plugins/
+<<<<<<< HEAD
 git clone https://github.com/alirezafallaah78/nextsafar_core_v2_5.git nextsafar-core
+=======
+git clone https://github.com/alirezafallah-dev/nextsafar-core.git
+>>>>>>> 0df7db7226b7731771c852ac1af53c642ca175dc
 
 # 2. Activate the plugin via WordPress admin or WP-CLI
 wp plugin activate nextsafar-core
