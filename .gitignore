@@ -1,0 +1,102 @@
+# ═══════════════════════════════════════════════════════
+# NextSafar Core Plugin - .gitignore
+# ═══════════════════════════════════════════════════════
+
+# ═══ WordPress Core (should not be in plugin repo) ═══
+wp-admin/
+wp-includes/
+wp-content/uploads/
+wp-content/cache/
+wp-content/upgrade/
+wp-content/backup-db/
+wp-content/backups/
+wp-content/blogs.dir/
+wp-config.php
+
+# ═══ IDE & Editor Files ═══
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ═══ Environment & Secrets (NEVER COMMIT) ═══
+.env
+.env.local
+.env.*.local
+wp-config-local.php
+*.pem
+*.key
+*.p12
+*.pfx
+secrets.json
+config-secrets.php
+
+# ═══ Build & Dependencies ═══
+node_modules/
+vendor/
+composer.lock
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ═══ Logs & Debug ═══
+*.log
+error_log
+debug.log
+php_error_log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ═══ OS Files ═══
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ═══ Testing & Coverage ═══
+coverage/
+.phpunit.result.cache
+.phpcs.xml
+.phpunit.xml
+tests/
+*.test.php
+
+# ═══ Distribution ═══
+*.zip
+*.tar.gz
+*.rar
+/build/
+/dist/
+/release/
+
+# ═══ Temporary Files ═══
+*.tmp
+*.bak
+*.backup
+.cache/
+tmp/
+temp/
+
+# ═══ Database Dumps (NEVER COMMIT) ═══
+*.sql
+*.sql.gz
+*.sql.bz2
+dump.sql
+backup.sql
+database.sql
+
+# Local secrets - never commit
+wp-content/plugins/nextsafar_core/inc/secrets.local.php
