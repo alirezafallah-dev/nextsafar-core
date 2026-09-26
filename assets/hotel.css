@@ -1,0 +1,320 @@
+/* ==========================================================================
+   NextSafar Hotel Metabox Styles
+   ========================================================================== */
+
+.nextsafar-hotel-metabox {
+  padding: 15px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.ns-section {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.ns-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1d2327;
+  border-bottom: 2px solid #2271b1;
+  padding-bottom: 10px;
+  margin: 0 0 20px 0;
+}
+
+/* ==========================================================================
+   Grid System
+   ========================================================================== */
+
+.ns-grid {
+  display: grid;
+  gap: 15px;
+}
+
+.ns-grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.ns-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.ns-grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.ns-grid-6 {
+  grid-template-columns: repeat(6, 1fr);
+}
+
+/* ==========================================================================
+   Form Fields
+   ========================================================================== */
+
+.ns-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ns-field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
+}
+
+.ns-input {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  width: 100%;
+}
+
+.ns-input:focus {
+  border-color: #2271b1;
+  outline: none;
+  box-shadow: 0 0 0 1px #2271b1;
+}
+
+.ns-textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+/* ==========================================================================
+   Nearby Locations
+   ========================================================================== */
+
+.ns-location-row {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 2fr 1.5fr 1fr 0.8fr 1.2fr auto;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 10px;
+  background: #f9f9f9;
+  border-radius: 4px;
+  align-items: center;
+}
+
+.ns-location-row input,
+.ns-location-row select {
+  width: 100%;
+  padding: 6px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  font-size: 13px;
+}
+
+/* ==========================================================================
+   Amenities - Accordion
+   ========================================================================== */
+
+.ns-amenity-group {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.ns-amenity-header {
+  width: 100%;
+  padding: 12px 15px;
+  background: #f0f0f1;
+  border: none;
+  text-align: right;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.ns-amenity-header:hover {
+  background: #e5e5e6;
+}
+
+.ns-amenity-header.active {
+  background: #2271b1;
+  color: white;
+}
+
+.ns-amenity-header.active .dashicons {
+  transform: rotate(180deg);
+}
+
+.ns-amenity-header .dashicons {
+  transition: transform 0.2s;
+}
+
+.ns-amenity-body {
+  padding: 15px;
+  background: #fff;
+  border-top: 1px solid #ddd;
+}
+
+.ns-amenity-item {
+  background: #fafafa;
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid #eee;
+}
+
+.ns-amenity-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.ns-amenity-main label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ns-extra-charge {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding-top: 5px;
+  border-top: 1px dashed #ddd;
+  margin-top: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #d9534f;
+}
+
+.ns-extra-charge input {
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   Custom Sections
+   ========================================================================== */
+
+.ns-custom-section-row {
+  display: grid;
+  grid-template-columns: 1fr 3fr auto;
+  gap: 10px;
+  margin-bottom: 10px;
+  align-items: start;
+}
+
+.ns-custom-section-row select,
+.ns-custom-section-row textarea {
+  width: 100%;
+}
+
+/* ==========================================================================
+   Modal
+   ========================================================================== */
+
+#working-hours-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ns-modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.ns-modal-content {
+  position: relative;
+  background: #fff;
+  padding: 25px;
+  border-radius: 8px;
+  width: 500px;
+  max-width: 90vw;
+  z-index: 1;
+}
+
+.ns-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #eee;
+}
+
+.ns-modal-header h3 {
+  margin: 0;
+}
+
+.close-modal {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #999;
+}
+
+.ns-wh-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ns-wh-table td {
+  padding: 6px;
+}
+
+.ns-wh-table input[type="time"] {
+  width: 100%;
+}
+
+.ns-modal-footer {
+  margin-top: 15px;
+  text-align: left;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 1200px) {
+  .ns-grid-6 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .ns-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ns-location-row {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .ns-grid-3,
+  .ns-grid-6 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .ns-grid-2,
+  .ns-grid-4 {
+    grid-template-columns: 1fr;
+  }
+}

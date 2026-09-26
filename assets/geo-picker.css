@@ -1,0 +1,54 @@
+#ns-geo-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, .55);
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ns-geo-modal-box {
+  width: 92%;
+  max-width: 960px;
+  height: 82vh;
+  background: #fff;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0,0,0,.35);
+}
+
+.ns-geo-modal-head {
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  border-bottom: 1px solid #dcdcde;
+  background: #f6f7f7;
+}
+
+.ns-geo-modal-head input {
+  flex: 1;
+  min-width: 0;
+}
+
+#ns-geo-map {
+  flex: 1;
+  min-height: 0;
+}
+
+.ns-geo-modal-foot {
+  padding: 8px 12px;
+  border-top: 1px solid #dcdcde;
+  background: #f6f7f7;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.ns-geo-modal-foot code {
+  background: #eef;
+  padding: 2px 6px;
+  border-radius: 4px;
+}

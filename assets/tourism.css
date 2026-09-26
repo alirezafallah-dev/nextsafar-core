@@ -1,0 +1,77 @@
+/* ==========================================================================
+   Tourism Taxonomy Styles
+   ========================================================================== */
+
+/* ==========================================================================
+   Tourism Grid
+   ========================================================================== */
+
+.ns-tourism-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+  margin-top: 15px;
+  padding: 15px;
+  background: #f9f9f9;
+  border-radius: 6px;
+}
+
+.ns-tourism-grid .form-field {
+  margin: 0;
+}
+
+.ns-tourism-image-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.ns-tourism-image-field .button {
+  margin-right: 5px;
+}
+
+.ns-tourism-preview img {
+  max-width: 150px;
+  height: auto;
+  border-radius: 4px;
+  border: 1px solid #ddd;
+}
+
+/* ==========================================================================
+   Table Columns
+   ========================================================================== */
+
+.column-image {
+  width: 60px;
+}
+
+.column-country {
+  width: 150px;
+}
+
+.column-name_en {
+  width: 150px;
+}
+
+.column-stats {
+  width: 100px;
+}
+
+/* ==========================================================================
+   Bulk Link Button
+   ========================================================================== */
+
+.ns-tourism-bulk-button {
+  margin: 15px 0;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .ns-tourism-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

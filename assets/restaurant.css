@@ -1,0 +1,306 @@
+/* ==========================================================================
+   NextSafar Restaurant Metabox Styles
+   ========================================================================== */
+
+.nextsafar-restaurant-metabox {
+  padding: 15px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+.ns-section {
+  background: #fff;
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.ns-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1d2327;
+  border-bottom: 2px solid #2271b1;
+  padding-bottom: 10px;
+  margin: 0 0 20px 0;
+}
+
+/* ==========================================================================
+   Grid System
+   ========================================================================== */
+
+.ns-grid {
+  display: grid;
+  gap: 15px;
+}
+
+.ns-grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.ns-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.ns-grid-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+/* ==========================================================================
+   Form Fields
+   ========================================================================== */
+
+.ns-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.ns-field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
+}
+
+.ns-input {
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 14px;
+  width: 100%;
+}
+
+.ns-input:focus {
+  border-color: #2271b1;
+  outline: none;
+  box-shadow: 0 0 0 1px #2271b1;
+}
+
+.ns-textarea {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 13px;
+  resize: vertical;
+}
+
+/* ==========================================================================
+   Working Hours
+   ========================================================================== */
+
+.ns-working-hours {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ns-wh-day {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 6px;
+  border: 1px solid #eee;
+  flex-wrap: wrap;
+}
+
+.ns-wh-day-name {
+  min-width: 80px;
+  font-weight: 600;
+  color: #1d2327;
+}
+
+.ns-wh-option {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ns-wh-option input {
+  cursor: pointer;
+}
+
+.ns-wh-time {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #555;
+}
+
+.ns-wh-time input[type="time"] {
+  padding: 6px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+/* ==========================================================================
+   Amenities - Accordion
+   ========================================================================== */
+
+.ns-amenities-accordion {
+  margin-top: 10px;
+}
+
+.ns-amenity-group {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.ns-amenity-header {
+  width: 100%;
+  padding: 12px 15px;
+  background: #f0f0f1;
+  border: none;
+  text-align: right;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.ns-amenity-header:hover {
+  background: #e5e5e6;
+}
+
+.ns-amenity-header.active {
+  background: #2271b1;
+  color: white;
+}
+
+.ns-amenity-header.active .dashicons {
+  transform: rotate(180deg);
+}
+
+.ns-amenity-header .dashicons {
+  transition: transform 0.2s;
+}
+
+.ns-amenity-body {
+  padding: 15px;
+  background: #fff;
+  border-top: 1px solid #ddd;
+}
+
+.ns-amenity-item {
+  background: #fafafa;
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid #eee;
+  margin-bottom: 8px;
+}
+
+.ns-amenity-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ns-amenity-main label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   Repeatable Fields
+   ========================================================================== */
+
+.ns-repeatable-wrapper {
+  margin-top: 15px;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 6px;
+  border: 1px dashed #ccc;
+}
+
+.ns-repeatable-item {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  align-items: center;
+}
+
+.ns-repeatable-item input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.ns-repeatable-item .remove-item {
+  background: #d63638;
+  color: #fff;
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.ns-repeatable-item .remove-item:hover {
+  background: #b32d2e;
+}
+
+.ns-btn-add {
+  margin-top: 8px;
+  padding: 6px 12px;
+  background: #2271b1;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.ns-btn-add:hover {
+  background: #135e96;
+}
+
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
+
+@media (max-width: 1200px) {
+  .ns-grid-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .ns-grid-2,
+  .ns-grid-3,
+  .ns-grid-4 {
+    grid-template-columns: 1fr;
+  }
+
+  .ns-wh-day {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .ns-wh-time {
+    width: 100%;
+    margin-top: 8px;
+  }
+}

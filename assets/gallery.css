@@ -1,0 +1,218 @@
+/* ==========================================================================
+   Gallery Wrapper
+   ========================================================================== */
+
+.ns-gallery-wrapper {
+  padding: 15px;
+  background: #fff;
+}
+.ns-gallery-status {
+  margin-bottom: 15px;
+  padding: 12px;
+  background: #f6f7f7;
+  border-radius: 6px;
+  border-right: 3px solid #2271b1;
+}
+.ns-gallery-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+.ns-gallery-status-row:last-child {
+  margin-bottom: 0;
+}
+.ns-gallery-label {
+  font-weight: 600;
+  min-width: 110px;
+}
+.ns-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+}
+.ns-badge-manual {
+  background: #d4edda;
+  color: #155724;
+}
+.ns-badge-api {
+  background: #d1ecf1;
+  color: #0c5460;
+}
+.ns-badge-empty {
+  background: #fff3cd;
+  color: #856404;
+}
+.ns-gallery-count {
+  color: #666;
+  font-size: 12px;
+}
+
+/* ==========================================================================
+   Gallery Grid
+   ========================================================================== */
+
+.ns-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  margin: 15px 0;
+  min-height: 100px;
+  padding: 12px;
+  background: #fafafa;
+  border: 2px dashed #ddd;
+  border-radius: 8px;
+}
+.ns-gallery-grid:empty::before {
+  content: "📷 هنوز تصویری اضافه نشده";
+  display: block;
+  text-align: center;
+  padding: 30px;
+  color: #999;
+  grid-column: 1 / -1;
+}
+.ns-gallery-item {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: move;
+  background: #f0f0f1;
+  transition: transform 0.2s;
+}
+.ns-gallery-item:hover {
+  transform: scale(1.02);
+}
+.ns-gallery-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ns-gallery-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.ns-gallery-item:hover .ns-gallery-actions {
+  opacity: 1;
+}
+.ns-gallery-actions button {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+.ns-gallery-view {
+  background: #2271b1;
+  color: #fff;
+}
+.ns-gallery-remove {
+  background: #d63638;
+  color: #fff;
+}
+.ns-gallery-drag-handle {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  cursor: move;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.ns-gallery-item:hover .ns-gallery-drag-handle {
+  opacity: 1;
+}
+
+/* ==========================================================================
+   Buttons
+   ========================================================================== */
+
+.ns-gallery-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.ns-gallery-help {
+  margin-top: 12px;
+  padding: 10px;
+  background: #e7f3ff;
+  border-right: 3px solid #2271b1;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #1e4a6e;
+}
+
+/* ==========================================================================
+   Modal
+   ========================================================================== */
+
+.ns-gallery-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ns-gallery-modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+}
+.ns-gallery-modal-content {
+  position: relative;
+  max-width: 90vw;
+  max-height: 90vh;
+  z-index: 1;
+}
+.ns-gallery-modal-content img {
+  max-width: 100%;
+  max-height: 90vh;
+  border-radius: 8px;
+}
+.ns-gallery-modal-close {
+  position: absolute;
+  top: -40px;
+  right: 0;
+  background: #fff;
+  border: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* ==========================================================================
+   Sortable Placeholder
+   ========================================================================== */
+
+.ns-gallery-item.ui-sortable-helper {
+  transform: rotate(2deg);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+}
+.ns-gallery-item.ui-sortable-placeholder {
+  visibility: visible !important;
+  background: #e7f3ff;
+  border: 2px dashed #2271b1;
+  border-radius: 8px;
+}
