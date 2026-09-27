@@ -160,64 +160,84 @@ class PerformanceMetrics {
             <!-- Response Time Distribution -->
             <div class="ns-section">
                 <h2>⏱️ توزیع Response Time</h2>
-                <div class="ns-response-distribution">
-                    <?php foreach ($metrics['response_distribution'] as $range => $count): ?>
-                        <?php 
-                        $percentage = $metrics['total_searches'] > 0 
-                            ? round(($count / $metrics['total_searches']) * 100, 1) 
-                            : 0;
+                
+                <?php if ($metrics['total_searches'] === 0): ?>
+                    <div class="ns-no-data">
+                        <div class="ns-no-data-icon">📊</div>
+                        <p>هنوز داده‌ای برای نمایش وجود ندارد.</p>
+                    </div>
+                <?php else: ?>
+                    <div class="ns-response-distribution">
+                        <?php foreach ($metrics['response_distribution'] as $range => $count): 
+                            $percentage = $metrics['total_searches'] > 0 
+                                ? round(($count / $metrics['total_searches']) * 100, 1) 
+                                : 0;
                         ?>
-                        <div class="ns-dist-row">
-                            <div class="ns-dist-label"><?php echo esc_html($range); ?></div>
-                            <div class="ns-dist-bar-container">
-                                <div class="ns-dist-bar" style="width: <?php echo $percentage; ?>%"></div>
+                            <div class="ns-dist-row">
+                                <div class="ns-dist-label"><?php echo esc_html($range); ?></div>
+                                <div class="ns-dist-bar-container">
+                                    <div class="ns-dist-bar" style="width: <?php echo $percentage; ?>%"></div>
+                                </div>
+                                <div class="ns-dist-value">
+                                    <?php echo number_format($count); ?> 
+                                    (<?php echo $percentage; ?>%)
+                                </div>
                             </div>
-                            <div class="ns-dist-value">
-                                <?php echo number_format($count); ?> 
-                                (<?php echo $percentage; ?>%)
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
+                        <?php endforeach; ?>
+                    </div>
+                <?php endif; ?>
             </div>
             
             <!-- Top Searches -->
             <div class="ns-section">
                 <h2>🔥 جستجوهای پرطرفدار</h2>
-                <table class="wp-list-table widefat fixed striped">
-                    <thead>
-                        <tr>
-                            <th>رتبه</th>
-                            <th>نوع</th>
-                            <th>مسیر</th>
-                            <th>تعداد</th>
-                            <th>Success Rate</th>
-                            <th>Avg Time</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($metrics['top_searches'] as $idx => $search): ?>
+                
+                <?php if (empty($metrics['top_searches'])): ?>
+                    <div class="ns-no-data">
+                        <div class="ns-no-data-icon">🔍</div>
+                        <p>هنوز جستجویی ثبت نشده است.</p>
+                        <p class="ns-no-data-sub">
+                            با انجام چند جستجو از طریق فرانت‌اند یا مستقیماً از طریق 
+                            <code>/wp-json/nextsafar/v1/hotels/search?city=Tehran&check_in=1405/08/10&check_out=1405/08/12&adults=2</code>
+                            داده‌ها را ایجاد کنید.
+                        </p>
+                    </div>
+                <?php else: ?>
+                    <table class="wp-list-table widefat fixed striped">
+                        <thead>
                             <tr>
-                                <td><strong>#<?php echo $idx + 1; ?></strong></td>
-                                <td>
-                                    <span class="ns-search-type ns-type-<?php echo esc_attr($search['type']); ?>">
-                                        <?php echo esc_html($search['type_label']); ?>
-                                    </span>
-                                </td>
-                                <td>
-                                    <code><?php echo esc_html($search['route']); ?></code>
-                                </td>
-                                <td><strong><?php echo number_format($search['count']); ?></strong></td>
-                                <td>
-                                    <span class="ns-success-rate <?php echo $search['success_rate'] >= 90 ? 'good' : ($search['success_rate'] >= 70 ? 'warn' : 'bad'); ?>">
-                                        <?php echo $search['success_rate']; ?>%
-                                    </span>
-                                </td>
-                                <td><?php echo number_format($search['avg_time'], 2); ?>s</td>
+                                <th>رتبه</th>
+                                <th>نوع</th>
+                                <th>مسیر</th>
+                                <th>تعداد</th>
+                                <th>Success Rate</th>
+                                <th>Avg Time</th>
                             </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($metrics['top_searches'] as $idx => $search): ?>
+                                <tr>
+                                    <td><strong>#<?php echo $idx + 1; ?></strong></td>
+                                    <td>
+                                        <span class="ns-search-type ns-type-<?php echo esc_attr($search['type']); ?>">
+                                            <?php echo esc_html($search['type_label']); ?>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <code><?php echo esc_html($search['route']); ?></code>
+                                    </td>
+                                    <td><strong><?php echo number_format($search['count']); ?></strong></td>
+                                    <td>
+                                        <span class="ns-success-rate <?php echo $search['success_rate'] >= 90 ? 'good' : ($search['success_rate'] >= 70 ? 'warn' : 'bad'); ?>">
+                                            <?php echo $search['success_rate']; ?>%
+                                        </span>
+                                    </td>
+                                    <td><?php echo number_format($search['avg_time'], 2); ?>s</td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
             </div>
             
             <!-- Error Analysis -->
@@ -260,19 +280,44 @@ class PerformanceMetrics {
             <!-- Hourly Traffic Chart (Visual Representation) -->
             <div class="ns-section">
                 <h2>📈 ترافیک ساعتی (24 ساعت گذشته)</h2>
-                <div class="ns-hourly-chart">
-                    <?php 
-                    $max_hourly = max(array_values($metrics['hourly_traffic']) ?: [1]);
-                    foreach ($metrics['hourly_traffic'] as $hour => $count): 
-                        $height = ($count / $max_hourly) * 100;
-                    ?>
-                        <div class="ns-hour-bar-wrapper">
-                            <div class="ns-hour-bar" style="height: <?php echo $height; ?>%" 
-                                 title="<?php echo esc_attr("$hour:00 - $count requests"); ?>"></div>
-                            <div class="ns-hour-label"><?php echo esc_html($hour); ?></div>
-                        </div>
-                    <?php endforeach; ?>
-                </div>
+                
+                <?php 
+                $hourly_values = array_values($metrics['hourly_traffic']);
+                $max_hourly = !empty($hourly_values) ? max($hourly_values) : 0;
+                $max_hourly = max(1, $max_hourly); // Prevent division by zero
+                $total_requests_24h = array_sum($hourly_values);
+                ?>
+                
+                <?php if ($total_requests_24h === 0): ?>
+                    <div class="ns-no-data">
+                        <div class="ns-no-data-icon">📭</div>
+                        <p>هیچ جستجویی در 24 ساعت گذشته ثبت نشده است.</p>
+                        <p class="ns-no-data-sub">
+                            برای دیدن نمودار، ابتدا چند جستجو از طریق 
+                            <a href="<?php echo admin_url('admin.php?page=nextsafar-dashboard'); ?>">داشبورد</a>
+                            یا 
+                            <code>/wp-json/nextsafar/v1/hotels/search</code>
+                            انجام دهید.
+                        </p>
+                    </div>
+                <?php else: ?>
+                    <div class="ns-hourly-chart">
+                        <?php foreach ($metrics['hourly_traffic'] as $hour => $count): 
+                            $height = max(2, ($count / $max_hourly) * 100); // Minimum 2% for visibility
+                        ?>
+                            <div class="ns-hour-bar-wrapper">
+                                <div class="ns-hour-bar <?php echo $count === 0 ? 'empty' : ''; ?>" 
+                                    style="height: <?php echo $height; ?>%" 
+                                    title="<?php echo esc_attr("ساعت $hour:00 - $count درخواست"); ?>"></div>
+                                <div class="ns-hour-label"><?php echo esc_html($hour); ?></div>
+                            </div>
+                        <?php endforeach; ?>
+                    </div>
+                    <div class="ns-chart-summary">
+                        <span>📊 مجموع درخواست‌های 24 ساعت گذشته: <strong><?php echo number_format($total_requests_24h); ?></strong></span>
+                        <span>📈 بیشترین ترافیک: <strong><?php echo number_format($max_hourly); ?></strong> درخواست در ساعت</span>
+                    </div>
+                <?php endif; ?>
             </div>
         </div>
         
@@ -541,6 +586,53 @@ class PerformanceMetrics {
                 color: #666;
                 margin-top: 4px;
             }
+            .ns-no-data {
+                text-align: center;
+                padding: 40px 20px;
+                background: #f9f9f9;
+                border: 2px dashed #ddd;
+                border-radius: 8px;
+            }
+            .ns-no-data-icon {
+                font-size: 48px;
+                margin-bottom: 12px;
+            }
+            .ns-no-data p {
+                margin: 8px 0;
+                color: #444;
+                font-size: 15px;
+            }
+            .ns-no-data-sub {
+                font-size: 12px !important;
+                color: #888 !important;
+            }
+            .ns-no-data code {
+                background: #fff;
+                padding: 2px 6px;
+                border-radius: 3px;
+                border: 1px solid #ddd;
+                direction: ltr;
+                display: inline-block;
+                max-width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .ns-chart-summary {
+                display: flex;
+                justify-content: space-between;
+                padding: 12px 0;
+                margin-top: 12px;
+                border-top: 1px solid #f0f0f0;
+                font-size: 13px;
+                color: #555;
+            }
+            .ns-hour-bar.empty {
+                background: #e0e0e0 !important;
+                opacity: 0.5;
+            }
+            .ns-hour-bar-wrapper:hover .ns-hour-bar {
+                background: linear-gradient(to top, #005a87, #0073aa) !important;
+            }
         </style>
         
         <script>
@@ -654,7 +746,8 @@ class PerformanceMetrics {
         $min_response_time = 0.1;
         $max_response_time = 10.0;
         
-        // Response time distribution
+        // Response time distribution - Safe calculation
+        $total_safe = max(1, $total_searches);
         $response_distribution = [
             '< 0.5s'    => (int) ($total_searches * 0.15),
             '0.5-1s'    => (int) ($total_searches * 0.35),
