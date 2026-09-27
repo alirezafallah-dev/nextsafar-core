@@ -1,102 +1,141 @@
 <?php
+/**
+ * NextSafar Core - Hotel REST API Endpoints
+ * 
+ * Uses the new Service Layer architecture:
+ * - HotelSearchService for search orchestration
+ * - ProviderFactory for automatic fallback
+ * - RateLimiter for abuse prevention
+ * - Validator for input validation
+ * 
+ * @package NextSafar\Hotels
+ * @since   2.6.0
+ */
 
 namespace NextSafar\Hotels;
 
 use NextSafar\Admin\LiveSearch;
-use function NextSafar\Search\search_hotels;
-use function NextSafar\Search\live_config;
+use NextSafar\Core\RateLimiter;
+use NextSafar\Core\Validator;
+use NextSafar\Core\ErrorHandler;
+use NextSafar\Core\Logger;
+use NextSafar\Search\HotelSearchService;
+use NextSafar\Search\FlightSearchService;
+use NextSafar\Search\ProviderFactory;
+use NextSafar\Search\DateConverter;
+use NextSafar\Search\PriceConverter;
 
 add_action('rest_api_init', function () {
 
     /* ========================================================================
-       Hotel Search with Smart Matching (Uses matcher.php)
-       ======================================================================== */
+       Hotel Search with Smart Matching + Rate Limiting + Validation
+       Endpoint: GET /nextsafar/v1/hotels/search
+       
+       Uses the new Service Layer for cleaner architecture.
+    ======================================================================== */
     register_rest_route('nextsafar/v1', '/hotels/search', [
         'methods'             => 'GET',
-        'permission_callback' => '__return_true',
+        'permission_callback' => RateLimiter::middleware('hotel_search'),
         'callback'            => function (\WP_REST_Request $req) {
-            $city      = sanitize_text_field($req->get_param('city') ?? '');
-            $q_en      = sanitize_text_field($req->get_param('q_en') ?? '');
-            $check_in  = sanitize_text_field($req->get_param('check_in') ?? '');
-            $check_out = sanitize_text_field($req->get_param('check_out') ?? '');
-            $adults    = intval($req->get_param('adults') ?? 2);
-            $children  = intval($req->get_param('children') ?? 0);
 
-            if (empty($city) || empty($check_in) || empty($check_out)) {
-                return new \WP_Error('missing_params', 'شهر و تاریخ‌ها الزامی هستند', ['status' => 400]);
+            // Step 1: Input validation
+            $validation = Validator::validate_hotel_search($req);
+            if (is_wp_error($validation)) {
+                return ErrorHandler::to_response($validation);
             }
 
-            /* Convert Jalali to Gregorian */
-            $check_in_greg  = LiveSearch::jalali_to_gregorian($check_in) ?? $check_in;
-            $check_out_greg = LiveSearch::jalali_to_gregorian($check_out) ?? $check_out;
+            $city       = sanitize_text_field($req->get_param('city') ?? '');
+            $q_en       = sanitize_text_field($req->get_param('q_en') ?? '');
+            $check_in   = sanitize_text_field($req->get_param('check_in') ?? '');
+            $check_out  = sanitize_text_field($req->get_param('check_out') ?? '');
+            $adults     = intval($req->get_param('adults') ?? 2);
+            $children   = intval($req->get_param('children') ?? 0);
 
+            // Step 2: Convert Jalali to Gregorian dates
+            $check_in_greg  = DateConverter::jalali_to_gregorian($check_in) ?? $check_in;
+            $check_out_greg = DateConverter::jalali_to_gregorian($check_out) ?? $check_out;
+
+            // Step 3: Validate date format after conversion
             if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $check_in_greg) ||
                 !preg_match('/^\d{4}-\d{2}-\d{2}$/', $check_out_greg)) {
-                return new \WP_Error('invalid_date', 'تاریخ نامعتبر است', ['status' => 400]);
+                return ErrorHandler::to_response(ErrorHandler::invalid_date($check_in));
             }
 
-            $date1  = new \DateTime($check_in_greg);
-            $date2  = new \DateTime($check_out_greg);
-            $nights = max(1, $date1->diff($date2)->days);
+            // Step 4: Calculate nights
+            $nights = DateConverter::calculate_nights($check_in_greg, $check_out_greg);
 
-            $cfg = ns_live_config();
+            // Step 5: Get active provider name
+            $provider_name = ProviderFactory::get_active_provider_name();
 
-            /* Cache */
-            $cache_key = "ns_hotel_merged_v5_{$cfg['provider']}_" .
+            // Step 6: Check cache
+            $cache_key = "ns_hotel_merged_v8_{$provider_name}_" .
                 md5("{$city}|{$check_in_greg}|{$check_out_greg}|{$adults}|{$children}");
 
             $cached = get_transient($cache_key);
-
             if ($cached !== false) {
+                Logger::debug('Hotel search cache hit', [
+                    'city'      => $city,
+                    'cache_key' => $cache_key,
+                ]);
                 return rest_ensure_response(array_merge($cached, ['from_cache' => true]));
             }
 
-            /* Site hotels */
+            // Step 7: Get hotels from local WordPress database
             $site_hotels = ns_hotel_site_list($city);
-            error_log("[NS Hotels] Site hotels for '$city': " . count($site_hotels));
+            Logger::debug('Site hotels fetched', [
+                'city'  => $city,
+                'count' => count($site_hotels),
+            ]);
 
-            /* Online search */
+            // Step 8: Online search using new Service Layer
             $online_hotels = [];
             $is_stale      = false;
 
-            try {
-                $hotels_result = ns_search_hotels([
-                    'q'         => $city,
-                    'q_en'      => $q_en ?: $city,
-                    'check_in'  => $check_in_greg,
-                    'check_out' => $check_out_greg,
-                    'adults'    => $adults,
-                    'children'  => $children,
+            $search_result = HotelSearchService::search([
+                'q'         => $city,
+                'q_en'      => $q_en ?: $city,
+                'check_in'  => $check_in_greg,
+                'check_out' => $check_out_greg,
+                'adults'    => $adults,
+                'children'  => $children,
+            ]);
+
+            if (is_wp_error($search_result)) {
+                Logger::warning('Hotel search failed', [
+                    'city'  => $city,
+                    'error' => $search_result->get_error_message(),
                 ]);
-
-                if (is_wp_error($hotels_result)) {
-                    error_log('[NS Hotels] Search failed: ' . $hotels_result->get_error_message());
-                    $is_stale = true;
-                } else {
-                    $online_hotels = $hotels_result;
-                }
-            } catch (\Throwable $e) {
-                error_log('[NS Hotels] Exception: ' . $e->getMessage());
                 $is_stale = true;
+            } else {
+                $online_hotels = $search_result;
             }
 
-            error_log('[NS Hotels] Online hotels: ' . count($online_hotels));
-
-            /* Match and merge */
+            // Step 9: Match and merge local + online hotels
             try {
-                $merged = ns_hotels_merge($site_hotels, $online_hotels, $cfg['provider']);
+                $merged = ns_hotels_merge($site_hotels, $online_hotels, $provider_name);
             } catch (\Throwable $e) {
-                error_log('[NS Hotels] Merge error: ' . $e->getMessage());
-                return new \WP_Error('merge_error', $e->getMessage(), ['status' => 500]);
+                Logger::critical('Hotel merge failed', [
+                    'city'    => $city,
+                    'message' => $e->getMessage(),
+                ]);
+                return ErrorHandler::to_response(
+                    ErrorHandler::server_error('خطا در ادغام نتایج جستجو.')
+                );
             }
 
-            error_log("[NS Hotels] Merged: site={$merged['site_count']}, online={$merged['online_count']}, matched={$merged['matched']}");
+            Logger::info('Hotel search completed', [
+                'city'         => $city,
+                'site_count'   => $merged['site_count'],
+                'online_count' => $merged['online_count'],
+                'matched'      => $merged['matched'],
+                'stale'        => $is_stale,
+            ]);
 
-            /* Response */
+            // Step 10: Build final response
             $response_data = [
                 'ok'       => true,
                 'items'    => $merged['items'],
-                'provider' => $cfg['provider'],
+                'provider' => $provider_name,
                 'meta'     => [
                     'nights'       => $nights,
                     'site_count'   => $merged['site_count'],
@@ -106,43 +145,44 @@ add_action('rest_api_init', function () {
                 ],
             ];
 
+            // Step 11: Cache the response for 2 hours
             set_transient($cache_key, $response_data, 2 * HOUR_IN_SECONDS);
 
-            return rest_ensure_response(array_merge($response_data, ['from_cache' => false]));
+            $response = rest_ensure_response(array_merge($response_data, ['from_cache' => false]));
+            return RateLimiter::add_headers($response, 'hotel_search');
         },
     ]);
 
     /* ========================================================================
-       Online Hotel Details (For Dedicated Page)
-       ======================================================================== */
+       Hotel Details Endpoint
+       Endpoint: GET /nextsafar/v1/hotels/details
+    ======================================================================== */
     register_rest_route('nextsafar/v1', '/hotels/details', [
         'methods'             => 'GET',
-        'permission_callback' => '__return_true',
+        'permission_callback' => RateLimiter::middleware('hotel_details'),
         'callback'            => function (\WP_REST_Request $req) {
+
+            // Input validation
+            $validation = Validator::validate_hotel_details($req);
+            if (is_wp_error($validation)) {
+                return ErrorHandler::to_response($validation);
+            }
+
             $token     = sanitize_text_field($req->get_param('token') ?? '');
             $check_in  = sanitize_text_field($req->get_param('check_in') ?? '');
             $check_out = sanitize_text_field($req->get_param('check_out') ?? '');
             $adults    = intval($req->get_param('adults') ?? 2);
             $name      = sanitize_text_field($req->get_param('name') ?? 'Hotels');
 
-            if ($token === '') {
-                return new \WP_Error('missing_token', 'توکن هتل الزامی است', ['status' => 400]);
-            }
-
-            if ($check_in === '')  $check_in  = date('Y-m-d', strtotime('+30 days'));
+            // Default dates if not provided
+            if ($check_in === '') $check_in = date('Y-m-d', strtotime('+30 days'));
             if ($check_out === '') $check_out = date('Y-m-d', strtotime('+31 days'));
 
-            $ci = LiveSearch::jalali_to_gregorian($check_in)  ?? $check_in;
-            $co = LiveSearch::jalali_to_gregorian($check_out) ?? $check_out;
+            $ci = DateConverter::jalali_to_gregorian($check_in) ?? $check_in;
+            $co = DateConverter::jalali_to_gregorian($check_out) ?? $check_out;
 
-            $cache_key = 'ns_hotel_details_' . md5($token . $ci . $co . $adults);
-            $cached    = get_transient($cache_key);
-
-            if ($cached !== false) {
-                return rest_ensure_response(['ok' => true, 'hotel' => $cached, 'from_cache' => true]);
-            }
-
-            $details = LiveSearch::hotel_details([
+            // Use new Service Layer for details
+            $details = HotelSearchService::get_details([
                 'token'      => $token,
                 'hotel_name' => $name,
                 'check_in'   => $ci,
@@ -151,73 +191,135 @@ add_action('rest_api_init', function () {
             ]);
 
             if (is_wp_error($details)) {
-                return new \WP_REST_Response([
-                    'ok'    => false,
-                    'error' => $details->get_error_message(),
-                ], 500);
+                return ErrorHandler::to_response($details);
             }
 
-            set_transient($cache_key, $details, 2 * HOUR_IN_SECONDS);
-
-            return rest_ensure_response(['ok' => true, 'hotel' => $details, 'from_cache' => false]);
+            return rest_ensure_response([
+                'ok'         => true,
+                'hotel'      => $details,
+                'from_cache' => false,
+            ]);
         },
     ]);
 
     /* ========================================================================
-       Clear Cache
-       ======================================================================== */
+       Clear Hotel Cache (Admin Only)
+       Endpoint: POST /nextsafar/v1/hotels/clear-cache
+    ======================================================================== */
     register_rest_route('nextsafar/v1', '/hotels/clear-cache', [
         'methods'             => 'POST',
-        'permission_callback' => '__return_true',
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
+        },
         'callback'            => function () {
+            // Clear search cache using new service
+            $search_deleted = HotelSearchService::clear_cache();
+            
+            // Clear site hotels cache
+            clear_site_hotels_cache();
+            
+            // Clear merged results cache
             global $wpdb;
-
-            $deleted = $wpdb->query(
-                "DELETE FROM {$wpdb->options} WHERE option_name LIKE '%_transient_ns_hotel_%' OR option_name LIKE '%_transient_timeout_ns_hotel_%'"
+            $merged_deleted = $wpdb->query(
+                $wpdb->prepare(
+                    "DELETE FROM {$wpdb->options} WHERE option_name LIKE %s OR option_name LIKE %s",
+                    '%\_transient\_ns\_hotel\_merged\_%',
+                    '%\_transient\_timeout\_ns\_hotel\_merged\_%'
+                )
             );
+
+            $total = $search_deleted + (int) $merged_deleted;
+
+            Logger::info('Hotel cache cleared', [
+                'search_deleted' => $search_deleted,
+                'merged_deleted' => $merged_deleted,
+            ]);
 
             return new \WP_REST_Response([
                 'ok'      => true,
-                'message' => "کش هتل پاک شد. {$deleted} آیتم حذف شد.",
+                'message' => "کش هتل پاک شد. {$total} آیتم حذف شد.",
             ], 200);
         },
     ]);
 
     /* ========================================================================
-       Test
-       ======================================================================== */
+       Test Search Endpoint (Development Only)
+       Endpoint: GET /nextsafar/v1/hotels/test-search
+    ======================================================================== */
     register_rest_route('nextsafar/v1', '/hotels/test-search', [
         'methods'             => 'GET',
         'permission_callback' => '__return_true',
         'callback'            => function (\WP_REST_Request $req) {
+
+            // Security: Only allow in development mode
+            if (!defined('WP_DEBUG') || !WP_DEBUG) {
+                return ErrorHandler::to_response(
+                    ErrorHandler::forbidden('این اندپوینت فقط در حالت توسعه در دسترس است.')
+                );
+            }
+
             $city      = sanitize_text_field($req->get_param('city') ?? 'Istanbul');
             $check_in  = date('Y-m-d', strtotime('+30 days'));
             $check_out = date('Y-m-d', strtotime('+32 days'));
-            $cfg       = ns_live_config();
 
-            $site_hotels = ns_hotel_site_list($city);
+            $provider_name = ProviderFactory::get_active_provider_name();
 
-            $online_hotels = ns_search_hotels([
-                'q'         => $city,
-                'q_en'      => $city,
-                'check_in'  => $check_in,
-                'check_out' => $check_out,
-                'adults'    => 2,
-                'children'  => 0,
-            ]);
+            try {
+                // Local hotels
+                $site_hotels = ns_hotel_site_list($city);
 
-            if (is_wp_error($online_hotels)) $online_hotels = [];
+                // Online hotels using new Service Layer
+                $search_result = HotelSearchService::search([
+                    'q'         => $city,
+                    'q_en'      => $city,
+                    'check_in'  => $check_in,
+                    'check_out' => $check_out,
+                    'adults'    => 2,
+                    'children'  => 0,
+                ]);
 
-            $merged = ns_hotels_merge($site_hotels, $online_hotels, $cfg['provider']);
+                $online_hotels = is_wp_error($search_result) ? [] : $search_result;
 
+                // Merge
+                $merged = ns_hotels_merge($site_hotels, $online_hotels, $provider_name);
+
+                return rest_ensure_response([
+                    'ok'           => true,
+                    'city'         => $city,
+                    'site_count'   => $merged['site_count'],
+                    'online_count' => $merged['online_count'],
+                    'matched'      => $merged['matched'],
+                    'first_hotel'  => $merged['items'][0] ?? null,
+                    'provider'     => $provider_name,
+                ]);
+            } catch (\Throwable $e) {
+                return ErrorHandler::to_response(
+                    ErrorHandler::handle_exception($e, 'test-search')
+                );
+            }
+        },
+    ]);
+
+    /* ========================================================================
+       Provider Status Endpoint (Admin Only)
+       Endpoint: GET /nextsafar/v1/hotels/provider-status
+       
+       Shows which providers are configured and available.
+    ======================================================================== */
+    register_rest_route('nextsafar/v1', '/hotels/provider-status', [
+        'methods'             => 'GET',
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
+        },
+        'callback'            => function () {
+            $statuses = ProviderFactory::get_all_statuses();
+            $active = ProviderFactory::get_active_provider_name();
+            
             return rest_ensure_response([
-                'ok'           => true,
-                'city'         => $city,
-                'site_count'   => $merged['site_count'],
-                'online_count' => $merged['online_count'],
-                'matched'      => $merged['matched'],
-                'first_hotel'  => $merged['items'][0] ?? null,
-                'provider'     => $cfg['provider'],
+                'ok'            => true,
+                'active'        => $active,
+                'providers'     => $statuses,
+                'usd_rate'      => PriceConverter::get_usd_rate(),
             ]);
         },
     ]);

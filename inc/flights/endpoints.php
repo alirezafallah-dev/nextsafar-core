@@ -1,205 +1,181 @@
 <?php
+/**
+ * NextSafar Core - Flight REST API Endpoints
+ * 
+ * Uses the new FlightSearchService for cleaner architecture.
+ * 
+ * @package NextSafar\Flights
+ * @since   2.6.0
+ */
 
 namespace NextSafar\Flights;
 
-use NextSafar\Admin\LiveSearch;
-use function NextSafar\Search\search\search_flights;
-use function NextSafar\Search\search\live_config;
+use NextSafar\Core\RateLimiter;
+use NextSafar\Core\ErrorHandler;
+use NextSafar\Core\Logger;
+use NextSafar\Search\FlightSearchService;
+use NextSafar\Search\ProviderFactory;
+use NextSafar\Search\DateConverter;
+use NextSafar\Search\AirportMapper;
+use NextSafar\Core\Validator;
 
 add_action('rest_api_init', function () {
 
     /* ========================================================================
-       1) Flight Search
-       ======================================================================== */
+       Flight Search Endpoint
+       Endpoint: GET /nextsafar/v1/flights/search
+    ======================================================================== */
     register_rest_route('nextsafar/v1', '/flights/search', [
-        'methods' => 'GET',
-        'permission_callback' => '__return_true',
-        'callback' => function (\WP_REST_Request $req) {
-            $origin_code = strtoupper(sanitize_text_field($req->get_param('originCode') ?? ''));
-            $dest_code = strtoupper(sanitize_text_field($req->get_param('destCode') ?? ''));
-            $date_raw = sanitize_text_field($req->get_param('date') ?? '');
-            $return_raw = sanitize_text_field($req->get_param('returnDate') ?? '');
-            $cabin = sanitize_text_field($req->get_param('cabin') ?? 'economy');
-            $adults = max(1, min(9, (int) ($req->get_param('adults') ?? 1)));
-            $children = max(0, min(8, (int) ($req->get_param('children') ?? 0)));
+        'methods'             => 'GET',
+        'permission_callback' => RateLimiter::middleware('flight_search'),
+        'callback'            => function (\WP_REST_Request $req) {
 
-            if (!$origin_code || !$dest_code || !$date_raw) {
-                return new \WP_REST_Response(['ok' => false, 'error' => 'missing_params'], 400);
+            // Step 1: Input validation
+            $validation = Validator::validate_flight_search($req);
+            if (is_wp_error($validation)) {
+                return ErrorHandler::to_response($validation);
             }
 
-            if (!preg_match('/^[A-Z]{3}$/', $origin_code) || !preg_match('/^[A-Z]{3}$/', $dest_code)) {
-                return new \WP_REST_Response(['ok' => false, 'error' => 'invalid_code'], 400);
-            }
+            $origin      = strtoupper(sanitize_text_field($req->get_param('origin') ?? ''));
+            $dest        = strtoupper(sanitize_text_field($req->get_param('dest') ?? ''));
+            $date        = sanitize_text_field($req->get_param('date') ?? '');
+            $return_date = sanitize_text_field($req->get_param('return_date') ?? '');
+            $trip_type   = sanitize_text_field($req->get_param('trip_type') ?? 'one_way');
+            $cabin       = sanitize_text_field($req->get_param('cabin') ?? 'economy');
+            $adults      = intval($req->get_param('adults') ?? 1);
+            $children    = intval($req->get_param('children') ?? 0);
 
-            $outbound = LiveSearch::jalali_to_gregorian($date_raw);
+            // Step 2: Convert dates
+            $date_greg = DateConverter::jalali_to_gregorian($date) ?? $date;
+            $return_greg = $return_date !== '' 
+                ? (DateConverter::jalali_to_gregorian($return_date) ?? $return_date) 
+                : '';
 
-            if (!$outbound) {
-                return new \WP_REST_Response(['ok' => false, 'error' => 'invalid_date'], 400);
-            }
-
-            if (strtotime($outbound) < strtotime(date('Y-m-d'))) {
-                return new \WP_REST_Response(['ok' => false, 'error' => 'past_date'], 400);
-            }
-
-            $trip_type = 'one_way';
-            $return_date = '';
-
-            if ($return_raw !== '') {
-                $return_date = LiveSearch::jalali_to_gregorian($return_raw);
-
-                if (!$return_date || strtotime($return_date) < strtotime($outbound)) {
-                    return new \WP_REST_Response(['ok' => false, 'error' => 'invalid_return_date'], 400);
-                }
-
-                $trip_type = 'round_trip';
-            }
-
-            /* Cache with provider name */
-            $provider = LiveSearch::get_provider();
-
-            $cache_key = "ns_flight_{$provider}_{$origin_code}_{$dest_code}_{$outbound}"
-                . ($return_date ? "_{$return_date}" : '_ow')
-                . "_{$cabin}_{$adults}_{$children}";
-
-            $cached = get_transient($cache_key);
-
-            if ($cached !== false) {
-                return new \WP_REST_Response([
-                    'ok' => true,
-                    'items' => $cached,
-                    'from_cache' => true,
-                    'provider' => $provider,
-                ], 200);
-            }
-
-            $flights = search_flights([
-                'origin' => $origin_code,
-                'dest' => $dest_code,
-                'date' => $outbound,
-                'return_date' => $return_date,
-                'trip_type' => $trip_type,
-                'cabin' => $cabin,
-                'adults' => $adults,
-                'children' => $children,
+            // Step 3: Search flights using new Service Layer
+            $result = FlightSearchService::search([
+                'origin'      => $origin,
+                'dest'        => $dest,
+                'date'        => $date_greg,
+                'return_date' => $return_greg,
+                'trip_type'   => $trip_type,
+                'cabin'       => $cabin,
+                'adults'      => $adults,
+                'children'    => $children,
             ]);
 
-            if (is_wp_error($flights)) {
-                return new \WP_REST_Response([
-                    'ok' => false,
-                    'error' => 'api_error',
-                    'message' => $flights->get_error_message(),
-                ], 500);
+            if (is_wp_error($result)) {
+                return ErrorHandler::to_response($result);
             }
 
-            set_transient($cache_key, $flights, 2 * HOUR_IN_SECONDS);
+            $provider_name = ProviderFactory::get_active_provider_name();
 
-            return new \WP_REST_Response([
-                'ok' => true,
-                'items' => $flights,
-                'from_cache' => false,
-                'provider' => $provider,
-            ], 200);
-        },
-    ]);
-
-    /* ========================================================================
-       2) Status Test
-       ======================================================================== */
-    register_rest_route('nextsafar/v1', '/flights/test-api', [
-        'methods' => 'GET',
-        'permission_callback' => '__return_true',
-        'callback' => function () {
-            $live_key = LiveSearch::get_active_key();
-
-            return new \WP_REST_Response([
-                'ok' => true,
-                'live_provider' => LiveSearch::get_provider(),
-                'live_key_set' => $live_key !== '',
-                'live_key_preview' => $live_key ? substr($live_key, 0, 6) . '...' : null,
-            ], 200);
-        },
-    ]);
-
-    /* ========================================================================
-       3) Date Test
-       ======================================================================== */
-    register_rest_route('nextsafar/v1', '/flights/test-date', [
-        'methods' => 'GET',
-        'permission_callback' => '__return_true',
-        'callback' => function (\WP_REST_Request $req) {
-            $input = sanitize_text_field($req->get_param('date') ?? '1405/07/10');
-
-            return new \WP_REST_Response([
-                'ok' => true,
-                'input' => $input,
-                'output' => LiveSearch::jalali_to_gregorian($input),
-            ], 200);
-        },
-    ]);
-
-    /* ========================================================================
-       4) Direct Test
-       ======================================================================== */
-    register_rest_route('nextsafar/v1', '/flights/test-search', [
-        'methods' => 'GET',
-        'permission_callback' => '__return_true',
-        'callback' => function (\WP_REST_Request $req) {
-            $from = strtoupper(sanitize_text_field($req->get_param('from') ?? 'JFK'));
-            $to = strtoupper(sanitize_text_field($req->get_param('to') ?? 'MAD'));
-            $date = sanitize_text_field($req->get_param('date') ?? '');
-
-            if ($date === '' || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
-                $date = LiveSearch::jalali_to_gregorian($date ?: '1405/08/15')
-                    ?? date('Y-m-d', strtotime('+30 days'));
-            }
-
-            $flights = search_flights([
-                'origin' => $from,
-                'dest' => $to,
-                'date' => $date,
-                'return_date' => '',
-                'trip_type' => 'one_way',
-                'cabin' => 'economy',
-                'adults' => 1,
-                'children' => 0,
+            Logger::info('Flight search completed', [
+                'origin'   => $origin,
+                'dest'     => $dest,
+                'count'    => count($result),
+                'provider' => $provider_name,
             ]);
 
-            if (is_wp_error($flights)) {
-                return new \WP_REST_Response([
-                    'ok' => false,
-                    'error' => 'api_error',
-                    'message' => $flights->get_error_message(),
-                ], 500);
-            }
-
-            return new \WP_REST_Response([
-                'ok' => true,
-                'provider' => LiveSearch::get_provider(),
-                'route' => "$from → $to",
-                'date' => $date,
-                'count' => count($flights),
-                'first_three' => array_slice($flights, 0, 3),
-            ], 200);
+            return rest_ensure_response([
+                'ok'       => true,
+                'flights'  => $result,
+                'count'    => count($result),
+                'provider' => $provider_name,
+                'meta'     => [
+                    'origin'      => $origin,
+                    'origin_city' => AirportMapper::city_fa($origin),
+                    'dest'        => $dest,
+                    'dest_city'   => AirportMapper::city_fa($dest),
+                    'date'        => $date_greg,
+                    'trip_type'   => $trip_type,
+                    'cabin'       => $cabin,
+                    'adults'      => $adults,
+                    'children'    => $children,
+                ],
+            ]);
         },
     ]);
 
     /* ========================================================================
-       5) Clear Flight Cache
-       ======================================================================== */
+       Clear Flight Cache (Admin Only)
+       Endpoint: POST /nextsafar/v1/flights/clear-cache
+    ======================================================================== */
     register_rest_route('nextsafar/v1', '/flights/clear-cache', [
-        'methods' => 'POST',
-        'permission_callback' => '__return_true',
-        'callback' => function () {
-            global $wpdb;
-
-            $deleted = $wpdb->query(
-                "DELETE FROM {$wpdb->options} WHERE option_name LIKE '%_transient_ns_flight_%' OR option_name LIKE '%_transient_timeout_ns_flight_%'"
-            );
+        'methods'             => 'POST',
+        'permission_callback' => function () {
+            return current_user_can('manage_options');
+        },
+        'callback'            => function () {
+            $deleted = FlightSearchService::clear_cache();
 
             return new \WP_REST_Response([
-                'ok' => true,
+                'ok'      => true,
                 'message' => "کش پرواز پاک شد. {$deleted} آیتم حذف شد.",
             ], 200);
+        },
+    ]);
+
+    /* ========================================================================
+       Test Flight Search (Development Only)
+       Endpoint: GET /nextsafar/v1/flights/test-search
+    ======================================================================== */
+    register_rest_route('nextsafar/v1', '/flights/test-search', [
+        'methods'             => 'GET',
+        'permission_callback' => '__return_true',
+        'callback'            => function (\WP_REST_Request $req) {
+
+            if (!defined('WP_DEBUG') || !WP_DEBUG) {
+                return ErrorHandler::to_response(
+                    ErrorHandler::forbidden('این اندپوینت فقط در حالت توسعه در دسترس است.')
+                );
+            }
+
+            $origin = strtoupper(sanitize_text_field($req->get_param('origin') ?? 'THR'));
+            $dest   = strtoupper(sanitize_text_field($req->get_param('dest') ?? 'MHD'));
+            $date   = date('Y-m-d', strtotime('+7 days'));
+
+            $result = FlightSearchService::search([
+                'origin'    => $origin,
+                'dest'      => $dest,
+                'date'      => $date,
+                'trip_type' => 'one_way',
+                'cabin'     => 'economy',
+                'adults'    => 1,
+                'children'  => 0,
+            ]);
+
+            if (is_wp_error($result)) {
+                return ErrorHandler::to_response($result);
+            }
+
+            return rest_ensure_response([
+                'ok'       => true,
+                'origin'   => $origin,
+                'dest'     => $dest,
+                'date'     => $date,
+                'count'    => count($result),
+                'flights'  => array_slice($result, 0, 5), // First 5 flights
+                'provider' => ProviderFactory::get_active_provider_name(),
+            ]);
+        },
+    ]);
+
+    /* ========================================================================
+       Airport List Endpoint (for autocomplete)
+       Endpoint: GET /nextsafar/v1/flights/airports
+    ======================================================================== */
+    register_rest_route('nextsafar/v1', '/flights/airports', [
+        'methods'             => 'GET',
+        'permission_callback' => '__return_true',
+        'callback'            => function (\WP_REST_Request $req) {
+            $limit = intval($req->get_param('limit') ?? 100);
+            $airports = AirportMapper::get_all_airports($limit);
+
+            return rest_ensure_response([
+                'ok'       => true,
+                'airports' => $airports,
+                'count'    => count($airports),
+            ]);
         },
     ]);
 });

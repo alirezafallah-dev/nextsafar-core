@@ -1,12 +1,11 @@
-
 <?php
 /**
  * Plugin Name: NextSafar Core
- * Plugin URI: https://github.com/alirezafallaah78/nextsafar_core_v2_5
- * Description: Core backend plugin for NextSafar travel platform - provides REST API for hotels, flights, destinations, and AI-powered trip planning
+ * Plugin URI: https://github.com/alirezafallah-dev/nextsafar-core
+ * Description: هسته مرکزی و بک‌اند هدلس (Headless) پلتفرم نکست‌سفر. ارائه‌دهنده REST API برای هتل، پرواز، مقاصد، همگام‌سازی با APIهای خارجی و برنامه‌ریزی سفر با هوش مصنوعی.
  * Version: 2.5.0
  * Author: Alireza Fallah
- * Author URI: https://github.com/alirezafallaah78
+ * Author URI: https://github.com/alirezafallah-dev
  * Text Domain: nextsafar
  * Domain Path: /languages
  * Requires PHP: 8.1
@@ -183,6 +182,17 @@ require_once NEXTSAFAR_PATH . 'inc/api/ai-providers.php';
 require_once NEXTSAFAR_PATH . 'inc/api/post-sync.php';
 
 // ═══════════════════════════════════════════════════════════
+// 13.5 ADMIN DASHBOARD - Management Interface
+// ═══════════════════════════════════════════════════════════
+if (is_admin()) {
+    require_once NEXTSAFAR_PATH . 'inc/admin/dashboard/class-dashboard-page.php';
+    require_once NEXTSAFAR_PATH . 'inc/admin/dashboard/class-provider-settings.php';
+    require_once NEXTSAFAR_PATH . 'inc/admin/dashboard/class-search-logs.php';
+    require_once NEXTSAFAR_PATH . 'inc/admin/dashboard/class-cache-manager.php';
+    require_once NEXTSAFAR_PATH . 'inc/admin/dashboard/class-performance-metrics.php';
+}
+
+// ═══════════════════════════════════════════════════════════
 // 14. CORE - Main plugin core (load last)
 // ═══════════════════════════════════════════════════════════
 require_once NEXTSAFAR_PATH . 'inc/core.php';
@@ -211,6 +221,29 @@ require_once NEXTSAFAR_PATH . 'inc/search/providers.php';
 require_once NEXTSAFAR_PATH . 'inc/flights/endpoints.php';
 require_once NEXTSAFAR_PATH . 'inc/hotels/endpoints.php';
 require_once NEXTSAFAR_PATH . 'inc/hotels/matcher.php';
+
+// ═══════════════════════════════════════════════════════════
+// 2.5 CORE INFRASTRUCTURE - Logger, RateLimiter, Validator, ErrorHandler
+// (باید قبل از بقیه فایل‌ها لود شود)
+// ═══════════════════════════════════════════════════════════
+require_once NEXTSAFAR_PATH . 'inc/core/class-ns-logger.php';
+require_once NEXTSAFAR_PATH . 'inc/core/class-ns-rate-limiter.php';
+require_once NEXTSAFAR_PATH . 'inc/core/class-ns-validator.php';
+require_once NEXTSAFAR_PATH . 'inc/core/class-ns-error-handler.php';
+
+// ═══════════════════════════════════════════════════════════
+// 2.6 SEARCH SERVICES - Provider Pattern + Service Layer
+// Must load AFTER core infrastructure
+// ═══════════════════════════════════════════════════════════
+require_once NEXTSAFAR_PATH . 'inc/search/class-provider-interface.php';
+require_once NEXTSAFAR_PATH . 'inc/search/class-price-converter.php';
+require_once NEXTSAFAR_PATH . 'inc/search/class-date-converter.php';
+require_once NEXTSAFAR_PATH . 'inc/search/class-airport-mapper.php';
+require_once NEXTSAFAR_PATH . 'inc/search/class-serpapi-provider.php';
+require_once NEXTSAFAR_PATH . 'inc/search/class-searchapi-provider.php';
+require_once NEXTSAFAR_PATH . 'inc/search/class-provider-factory.php';
+require_once NEXTSAFAR_PATH . 'inc/search/class-hotel-search-service.php';
+require_once NEXTSAFAR_PATH . 'inc/search/class-flight-search-service.php';
 
 // ═══════════════════════════════════════════════════════════
 // ACTIVATION / DEACTIVATION HOOKS
