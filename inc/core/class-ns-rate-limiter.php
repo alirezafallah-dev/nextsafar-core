@@ -19,38 +19,56 @@ class RateLimiter {
     const PREFIX = 'ns_rate_limit:';
 
     /**
-     * تنظیمات پیش‌فرض برای هر اندپوینت
+     * Default rate limits for each endpoint
      */
     private static $default_limits = [
-        // جستجوی هتل: 30 درخواست در 10 دقیقه
+        // Hotel search: 30 requests per 10 minutes
         'hotel_search' => [
             'max_requests' => 30,
             'window_seconds' => 600,
             'message' => 'تعداد جستجوهای شما بیش از حد مجاز است. لطفاً چند دقیقه صبر کنید.',
         ],
-        // جستجوی پرواز: 30 درخواست در 10 دقیقه
+        // Flight search: 30 requests per 10 minutes
         'flight_search' => [
             'max_requests' => 30,
             'window_seconds' => 600,
             'message' => 'تعداد جستجوهای شما بیش از حد مجاز است. لطفاً چند دقیقه صبر کنید.',
         ],
-        // جزئیات هتل: 60 درخواست در 10 دقیقه
+        // Hotel details: 60 requests per 10 minutes
         'hotel_details' => [
             'max_requests' => 60,
             'window_seconds' => 600,
             'message' => 'تعداد درخواست‌های شما بیش از حد مجاز است.',
         ],
-        // عمومی: 100 درخواست در 1 ساعت
+        // General: 100 requests per hour
         'general' => [
             'max_requests' => 100,
             'window_seconds' => 3600,
             'message' => 'تعداد درخواست‌های شما بیش از حد مجاز است. لطفاً بعداً تلاش کنید.',
         ],
-        // لاگین: 5 تلاش در 15 دقیقه
+        // Login: 5 attempts per 15 minutes
         'login' => [
             'max_requests' => 5,
             'window_seconds' => 900,
             'message' => 'تعداد تلاش‌های ورود بیش از حد مجاز است. لطفاً 15 دقیقه صبر کنید.',
+        ],
+        
+        // ─────────────────────────────────────────────────────────
+        // BOOKING ENDPOINTS (New in Phase 3)
+        // ─────────────────────────────────────────────────────────
+        
+        // Booking creation: 10 per hour (prevent spam)
+        'booking_create' => [
+            'max_requests' => 10,
+            'window_seconds' => 3600,
+            'message' => 'تعداد رزروهای شما بیش از حد مجاز است. لطفاً بعداً تلاش کنید.',
+        ],
+        
+        // Document upload: 50 per hour
+        'booking_upload' => [
+            'max_requests' => 50,
+            'window_seconds' => 3600,
+            'message' => 'تعداد بارگذاری‌های شما بیش از حد مجاز است.',
         ],
     ];
 

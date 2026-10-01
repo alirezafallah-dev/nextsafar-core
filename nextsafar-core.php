@@ -279,6 +279,29 @@ require_once NEXTSAFAR_PATH . 'inc/booking/class-booking-file-uploader.php';
 require_once NEXTSAFAR_PATH . 'inc/booking/adapters/class-visa-booking-adapter.php';
 
 // ═══════════════════════════════════════════════════════════
+// 2.10 BOOKING REST API ENDPOINTS
+// ═══════════════════════════════════════════════════════════
+require_once NEXTSAFAR_PATH . 'inc/booking/class-booking-endpoints.php';
+
+// ═══════════════════════════════════════════════════════════
+// 2.11 PAYMENT SYSTEM
+// ═══════════════════════════════════════════════════════════
+require_once NEXTSAFAR_PATH . 'inc/payment/class-payment-gateway-interface.php';
+require_once NEXTSAFAR_PATH . 'inc/payment/gateways/class-zarinpal-gateway.php';
+require_once NEXTSAFAR_PATH . 'inc/payment/class-payment-service.php';
+require_once NEXTSAFAR_PATH . 'inc/booking/class-booking-sms.php';
+
+// ═══════════════════════════════════════════════════════════
+// 2.12 ADMIN BOOKING MANAGEMENT
+// ═══════════════════════════════════════════════════════════
+if (is_admin()) {
+    require_once NEXTSAFAR_PATH . 'inc/admin/booking/class-admin-booking-list.php';
+    require_once NEXTSAFAR_PATH . 'inc/admin/booking/class-admin-booking-detail.php';
+    require_once NEXTSAFAR_PATH . 'inc/admin/booking/class-admin-booking-stats.php';
+    require_once NEXTSAFAR_PATH . 'inc/admin/booking/class-admin-booking-menu.php';
+}
+
+// ═══════════════════════════════════════════════════════════
 // ACTIVATION / DEACTIVATION HOOKS
 // ═══════════════════════════════════════════════════════════
 register_activation_hook(__FILE__, ['NextSafar\Activator', 'activate']);

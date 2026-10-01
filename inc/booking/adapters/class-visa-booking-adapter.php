@@ -351,7 +351,7 @@ class VisaBookingAdapter {
      * @param array $data
      * @return int|\WP_Error User ID or error
      */
-    private static function get_or_create_user(array $data): int|\WP_Error {
+    public static function get_or_create_user(array $data): int|\WP_Error {
         // If user is logged in, use their ID
         if (is_user_logged_in()) {
             return get_current_user_id();
