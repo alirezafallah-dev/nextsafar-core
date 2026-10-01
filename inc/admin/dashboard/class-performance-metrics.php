@@ -21,23 +21,8 @@ class PerformanceMetrics {
      * Initialize metrics page
      */
     public static function init(): void {
-        add_action('admin_menu', [__CLASS__, 'add_submenu'], 20);
         add_action('wp_ajax_ns_metrics_data', [__CLASS__, 'ajax_get_metrics']);
         add_action('wp_ajax_ns_export_metrics', [__CLASS__, 'ajax_export_metrics']);
-    }
-    
-    /**
-     * Add submenu item
-     */
-    public static function add_submenu(): void {
-        add_submenu_page(
-            'nextsafar-dashboard',
-            'Performance Metrics',
-            'Metrics',
-            'manage_options',
-            'nextsafar-metrics',
-            [__CLASS__, 'render_page']
-        );
     }
     
     /**

@@ -2,7 +2,8 @@
 /**
  * NextSafar Core - Admin Booking Menu
  * 
- * Registers admin menu and pages for booking management.
+ * Menu registration moved to inc/admin/menu.php
+ * This file only handles AJAX actions for booking management.
  * 
  * @package NextSafar\Admin\Booking
  * @since   2.7.0
@@ -15,80 +16,56 @@ if (!defined('ABSPATH')) exit;
 class AdminBookingMenu {
     
     /**
-     * Initialize
+     * Initialize (menu registration moved to Menu class)
      */
     public static function init(): void {
-        add_action('admin_menu', [__CLASS__, 'add_menu'], 25);
-        add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_assets']);
+        // Menu registration is now in inc/admin/menu.php
         
-        // AJAX handlers
+        // AJAX handlers (keep these)
         add_action('wp_ajax_ns_update_booking_status', [__CLASS__, 'ajax_update_status']);
         add_action('wp_ajax_ns_verify_document', [__CLASS__, 'ajax_verify_document']);
         add_action('wp_ajax_ns_delete_booking', [__CLASS__, 'ajax_delete_booking']);
-    }
-    
-    /**
-     * Add menu items
-     */
-    public static function add_menu(): void {
-        // Bookings list page
-        add_submenu_page(
-            'nextsafar-dashboard',
-            'مدیریت رزروها',
-            'رزروها',
-            'manage_options',
-            'nextsafar-bookings',
-            [AdminBookingList::class, 'render_page']
-        );
         
-        // Booking detail page (hidden from menu)
-        add_submenu_page(
-            null, // Hidden
-            'جزئیات رزرو',
-            'جزئیات رزرو',
-            'manage_options',
-            'nextsafar-booking-detail',
-            [AdminBookingDetail::class, 'render_page']
-        );
-        
-        // Booking stats page
-        add_submenu_page(
-            'nextsafar-dashboard',
-            'آمار رزروها',
-            'آمار رزروها',
-            'manage_options',
-            'nextsafar-booking-stats',
-            [AdminBookingStats::class, 'render_page']
-        );
+        // Assets
+        add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_assets']);
     }
     
     /**
      * Enqueue admin assets
      */
     public static function enqueue_assets(string $hook): void {
-        if (strpos($hook, 'nextsafar-booking') === false) {
+        if (strpos($hook, 'nextsafar-booking') === false && 
+            strpos($hook, 'nextsafar-dashboard') === false) {
             return;
         }
         
-        wp_enqueue_style(
-            'ns-admin-booking',
-            NEXTSAFAR_URL . 'assets/admin/booking.css',
-            [],
-            NEXTSAFAR_VERSION
-        );
+        // Load only if CSS/JS files exist
+        $css_path = NEXTSAFAR_PATH . 'assets/admin/booking.css';
+        $js_path = NEXTSAFAR_PATH . 'assets/admin/booking.js';
         
-        wp_enqueue_script(
-            'ns-admin-booking',
-            NEXTSAFAR_URL . 'assets/admin/booking.js',
-            ['jquery'],
-            NEXTSAFAR_VERSION,
-            true
-        );
+        if (file_exists($css_path)) {
+            wp_enqueue_style(
+                'ns-admin-booking',
+                NEXTSAFAR_URL . 'assets/admin/booking.css',
+                [],
+                NEXTSAFAR_VERSION
+            );
+        }
         
-        wp_localize_script('ns-admin-booking', 'nsBooking', [
-            'ajaxUrl' => admin_url('admin-ajax.php'),
-            'nonce'   => wp_create_nonce('ns_booking_admin'),
-        ]);
+        if (file_exists($js_path)) {
+            wp_enqueue_script(
+                'ns-admin-booking',
+                NEXTSAFAR_URL . 'assets/admin/booking.js',
+                ['jquery'],
+                NEXTSAFAR_VERSION,
+                true
+            );
+            
+            wp_localize_script('ns-admin-booking', 'nsBooking', [
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'nonce'   => wp_create_nonce('ns_booking_admin'),
+            ]);
+        }
     }
     
     /**
@@ -174,7 +151,7 @@ class AdminBookingMenu {
             wp_send_json_error(['message' => 'پارامترهای نامعتبر']);
         }
         
-        // Delete documents first
+        // Delete documents
         \NextSafar\Booking\BookingFileUploader::delete_booking_documents($booking_id);
         
         // Delete passengers

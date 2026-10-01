@@ -22,61 +22,9 @@ class DashboardPage {
      * Initialize dashboard
      */
     public static function init(): void {
-        add_action('admin_menu', [__CLASS__, 'add_menu'], 5);
         add_action('admin_enqueue_scripts', [__CLASS__, 'enqueue_assets']);
         add_action('wp_ajax_ns_dashboard_stats', [__CLASS__, 'ajax_get_stats']);
         add_action('wp_ajax_ns_clear_all_cache', [__CLASS__, 'ajax_clear_cache']);
-    }
-    
-    /**
-     * Add menu item
-     */
-    public static function add_menu(): void {
-        add_menu_page(
-            'NextSafar Dashboard',
-            'NextSafar',
-            'manage_options',
-            'nextsafar-dashboard',
-            [__CLASS__, 'render_page'],
-            'dashicons-airplane',
-            3
-        );
-        
-        add_submenu_page(
-            'nextsafar-dashboard',
-            'Dashboard',
-            'Overview',
-            'manage_options',
-            'nextsafar-dashboard',
-            [__CLASS__, 'render_page']
-        );
-        
-        add_submenu_page(
-            'nextsafar-dashboard',
-            'Provider Settings',
-            'Providers',
-            'manage_options',
-            'nextsafar-providers',
-            [ProviderSettings::class, 'render_page']
-        );
-        
-        add_submenu_page(
-            'nextsafar-dashboard',
-            'Search Logs',
-            'Logs',
-            'manage_options',
-            'nextsafar-logs',
-            [SearchLogs::class, 'render_page']
-        );
-        
-        add_submenu_page(
-            'nextsafar-dashboard',
-            'Cache Manager',
-            'Cache',
-            'manage_options',
-            'nextsafar-cache',
-            [CacheManager::class, 'render_page']
-        );
     }
     
     /**
