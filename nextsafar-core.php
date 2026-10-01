@@ -246,6 +246,39 @@ require_once NEXTSAFAR_PATH . 'inc/search/class-hotel-search-service.php';
 require_once NEXTSAFAR_PATH . 'inc/search/class-flight-search-service.php';
 
 // ═══════════════════════════════════════════════════════════
+// 2.7 BOOKING & PAYMENT ENGINE
+// Must load AFTER core infrastructure
+// ═══════════════════════════════════════════════════════════
+require_once NEXTSAFAR_PATH . 'inc/booking/class-booking-table.php';
+require_once NEXTSAFAR_PATH . 'inc/payment/class-payment-table.php';
+
+// Create tables on plugin load (safe: CREATE IF NOT EXISTS)
+add_action('init', function () {
+    \NextSafar\Booking\BookingTable::maybe_upgrade();
+    \NextSafar\Payment\PaymentTable::maybe_upgrade();
+}, 1);
+
+// ═══════════════════════════════════════════════════════════
+// 2.8 BOOKING PASSENGERS & DOCUMENTS
+// ═══════════════════════════════════════════════════════════
+require_once NEXTSAFAR_PATH . 'inc/booking/class-booking-passenger-table.php';
+require_once NEXTSAFAR_PATH . 'inc/booking/class-booking-document-table.php';
+
+// Upgrade on init
+add_action('init', function () {
+    \NextSafar\Booking\BookingPassengerTable::maybe_upgrade();
+    \NextSafar\Booking\BookingDocumentTable::maybe_upgrade();
+}, 2);
+
+// ═══════════════════════════════════════════════════════════
+// 2.9 VISA BOOKING LOGIC
+// ═══════════════════════════════════════════════════════════
+require_once NEXTSAFAR_PATH . 'inc/booking/class-visa-price-calculator.php';
+require_once NEXTSAFAR_PATH . 'inc/booking/class-visa-validator.php';
+require_once NEXTSAFAR_PATH . 'inc/booking/class-booking-file-uploader.php';
+require_once NEXTSAFAR_PATH . 'inc/booking/adapters/class-visa-booking-adapter.php';
+
+// ═══════════════════════════════════════════════════════════
 // ACTIVATION / DEACTIVATION HOOKS
 // ═══════════════════════════════════════════════════════════
 register_activation_hook(__FILE__, ['NextSafar\Activator', 'activate']);

@@ -30,6 +30,15 @@ class Activator {
         /* Create geo table */
         GeoTable::create_table();
 
+        // Create Booking and Payment tables
+        \NextSafar\Booking\BookingTable::create_table();
+        \NextSafar\Payment\PaymentTable::create_table();
+
+        // Booking passengers table
+        \NextSafar\Booking\BookingPassengerTable::create_table();
+        // Booking documents table
+        \NextSafar\Booking\BookingDocumentTable::create_table();
+
         /* Register post types and taxonomies */
         Core::register_post_types();
         Core::register_taxonomies();
