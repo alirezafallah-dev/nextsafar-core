@@ -1,222 +1,119 @@
 <?php
 /**
- * NextSafar Core - Provider Settings Page
- * 
- * Manages API keys and provider configuration.
+ * Provider Settings Page
+ * API connection management for search engine
  * 
  * @package NextSafar\Admin\Dashboard
- * @since   2.6.0
+ * @since   3.1.0
  */
 
 namespace NextSafar\Admin\Dashboard;
-
-use NextSafar\Search\ProviderFactory;
-use NextSafar\Core\Logger;
 
 if (!defined('ABSPATH')) exit;
 
 class ProviderSettings {
     
-    /**
-     * Render provider settings page
-     */
     public static function render_page(): void {
         if (!current_user_can('manage_options')) return;
         
         $message = '';
-        $message_type = '';
         
-        // Handle form submission
-        if (isset($_POST['save_providers']) && wp_verify_nonce($_POST['_wpnonce'], 'ns_providers_save')) {
-            update_option('ns_live_provider', sanitize_text_field($_POST['primary_provider'] ?? 'serpapi'));
-            update_option('ns_live_serpapi_key', sanitize_text_field($_POST['serpapi_key'] ?? ''));
-            update_option('ns_live_searchapi_key', sanitize_text_field($_POST['searchapi_key'] ?? ''));
-            update_option('ns_live_usd_rate', floatval($_POST['usd_rate'] ?? 0));
-            
-            $message = '✓ تنظیمات با موفقیت ذخیره شد';
-            $message_type = 'success';
-            
-            Logger::info('Provider settings updated', [
-                'primary' => $_POST['primary_provider'] ?? 'serpapi',
-            ]);
+        // Save settings
+        if (isset($_POST['save_provider_settings']) && check_admin_referer('nextsafar_provider_settings')) {
+            update_option('nextsafar_searchapi_key', sanitize_text_field($_POST['searchapi_key'] ?? ''));
+            update_option('nextsafar_serpapi_key', sanitize_text_field($_POST['serpapi_key'] ?? ''));
+            update_option('nextsafar_active_source', sanitize_text_field($_POST['active_source'] ?? 'searchapi'));
+            update_option('nextsafar_provider_timeout', absint($_POST['timeout'] ?? 30));
+            update_option('nextsafar_provider_retries', absint($_POST['retries'] ?? 2));
+            $message = 'تنظیمات ذخیره شد';
         }
         
-        // Test connections
-        if (isset($_POST['test_serpapi']) && wp_verify_nonce($_POST['_wpnonce'], 'ns_providers_save')) {
-            $provider = ProviderFactory::create('serpapi');
-            $test = $provider->test_connection();
-            $message = $test['message'];
-            $message_type = $test['ok'] ? 'success' : 'error';
-        }
-        
-        if (isset($_POST['test_searchapi']) && wp_verify_nonce($_POST['_wpnonce'], 'ns_providers_save')) {
-            $provider = ProviderFactory::create('searchapi');
-            $test = $provider->test_connection();
-            $message = $test['message'];
-            $message_type = $test['ok'] ? 'success' : 'error';
-        }
-        
-        $primary = get_option('ns_live_provider', 'serpapi');
-        $serpapi_key = get_option('ns_live_serpapi_key', '');
-        $searchapi_key = get_option('ns_live_searchapi_key', '');
-        $usd_rate = get_option('ns_live_usd_rate', 0);
-        $statuses = ProviderFactory::get_all_statuses();
+        $searchapi_key = get_option('nextsafar_searchapi_key', '');
+        $serpapi_key = get_option('nextsafar_serpapi_key', '');
+        $active_source = get_option('nextsafar_active_source', 'searchapi');
+        $timeout = get_option('nextsafar_provider_timeout', 30);
+        $retries = get_option('nextsafar_provider_retries', 2);
         ?>
         <div class="wrap">
-            <h1>تنظیمات Provider‌ها</h1>
+            <h1>ارائه‌دهندگان اتصال جستجو</h1>
             
             <?php if ($message): ?>
-                <div class="notice notice-<?php echo esc_attr($message_type); ?> is-dismissible">
-                    <p><?php echo esc_html($message); ?></p>
-                </div>
+                <div class="notice notice-success is-dismissible"><p><?php echo esc_html($message); ?></p></div>
             <?php endif; ?>
             
-            <div class="ns-settings-card">
-                <h2>Provider اصلی</h2>
+            <!-- Connection Status -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px;">
+                <div style="background:#fff;padding:24px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border-right:4px solid <?php echo !empty($searchapi_key) ? '#00a32a' : '#d63638'; ?>;">
+                    <h2 style="margin-top:0;">سرچ‌ای‌پی‌آی</h2>
+                    <p style="font-size:24px;font-weight:bold;color:<?php echo !empty($searchapi_key) ? '#00a32a' : '#d63638'; ?>;">
+                        <?php echo !empty($searchapi_key) ? '✅ متصل' : '❌ قطع'; ?>
+                    </p>
+                    <?php if (!empty($searchapi_key)): ?>
+                        <p style="color:#666;font-size:12px;">کلید: <?php echo substr($searchapi_key, 0, 8); ?>...</p>
+                    <?php endif; ?>
+                </div>
+                
+                <div style="background:#fff;padding:24px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);border-right:4px solid <?php echo !empty($serpapi_key) ? '#00a32a' : '#d63638'; ?>;">
+                    <h2 style="margin-top:0;">سرپ‌ای‌پی‌آی</h2>
+                    <p style="font-size:24px;font-weight:bold;color:<?php echo !empty($serpapi_key) ? '#00a32a' : '#d63638'; ?>;">
+                        <?php echo !empty($serpapi_key) ? '✅ متصل' : '❌ قطع'; ?>
+                    </p>
+                    <?php if (!empty($serpapi_key)): ?>
+                        <p style="color:#666;font-size:12px;">کلید: <?php echo substr($serpapi_key, 0, 8); ?>...</p>
+                    <?php endif; ?>
+                </div>
+            </div>
+            
+            <!-- Settings Form -->
+            <div style="background:#fff;padding:24px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+                <h2 style="margin-top:0;">تنظیمات اتصال</h2>
                 <form method="post">
-                    <?php wp_nonce_field('ns_providers_save'); ?>
-                    
+                    <?php wp_nonce_field('nextsafar_provider_settings'); ?>
                     <table class="form-table">
                         <tr>
-                            <th>Provider پیش‌فرض:</th>
+                            <th>کلید سرچ‌ای‌پی‌آی:</th>
                             <td>
-                                <select name="primary_provider">
-                                    <option value="serpapi" <?php selected($primary, 'serpapi'); ?>>
-                                        SerpApi (توصیه می‌شود)
-                                    </option>
-                                    <option value="searchapi" <?php selected($primary, 'searchapi'); ?>>
-                                        SearchApi (Fallback)
-                                    </option>
+                                <input type="password" name="searchapi_key" value="<?php echo esc_attr($searchapi_key); ?>" class="regular-text" dir="ltr" autocomplete="off">
+                                <p class="description">از سایت سرچ‌ای‌پی‌آی‌آیو دریافت کنید</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>کلید سرپ‌ای‌پی‌آی:</th>
+                            <td>
+                                <input type="password" name="serpapi_key" value="<?php echo esc_attr($serpapi_key); ?>" class="regular-text" dir="ltr" autocomplete="off">
+                                <p class="description">از سایت سرپ‌ای‌پی‌آی‌آیو دریافت کنید</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>منبع فعال:</th>
+                            <td>
+                                <select name="active_source">
+                                    <option value="searchapi" <?php selected($active_source, 'searchapi'); ?>>سرچ‌ای‌پی‌آی</option>
+                                    <option value="serpapi" <?php selected($active_source, 'serpapi'); ?>>سرپ‌ای‌پی‌آی</option>
                                 </select>
-                                <p class="description">
-                                    اگر Provider اصلی با خطا مواجه شود، سیستم به صورت خودکار به Fallback می‌رود.
-                                </p>
+                                <p class="description">منبع اصلی برای جستجو</p>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>زمان انتظار (ثانیه):</th>
+                            <td>
+                                <input type="number" name="timeout" value="<?php echo esc_attr($timeout); ?>" min="5" max="120" class="small-text">
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>تعداد تلاش مجدد:</th>
+                            <td>
+                                <input type="number" name="retries" value="<?php echo esc_attr($retries); ?>" min="0" max="5" class="small-text">
                             </td>
                         </tr>
                     </table>
-            </div>
-            
-            <div class="ns-settings-card">
-                <h2>SerpApi (Primary)</h2>
-                <div class="ns-provider-status <?php echo $statuses['serpapi']['available'] ? 'active' : 'inactive'; ?>">
-                    <?php echo $statuses['serpapi']['available'] ? '✓ فعال' : '✗ غیرفعال'; ?>
-                </div>
-                <table class="form-table">
-                    <tr>
-                        <th>API Key:</th>
-                        <td>
-                            <input type="password" 
-                                   name="serpapi_key" 
-                                   value="<?php echo esc_attr($serpapi_key); ?>" 
-                                   class="regular-text"
-                                   dir="ltr"
-                                   style="font-family: monospace;">
-                            <p class="description">
-                                از <a href="https://serpapi.com" target="_blank">serpapi.com</a> دریافت کنید
-                            </p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th></th>
-                        <td>
-                            <button type="submit" name="test_serpapi" class="button">
-                                🧪 تست اتصال
-                            </button>
-                        </td>
-                    </tr>
-                </table>
-            </div>
-            
-            <div class="ns-settings-card">
-                <h2>SearchApi (Fallback)</h2>
-                <div class="ns-provider-status <?php echo $statuses['searchapi']['available'] ? 'active' : 'inactive'; ?>">
-                    <?php echo $statuses['searchapi']['available'] ? '✓ فعال' : '✗ غیرفعال'; ?>
-                </div>
-                <table class="form-table">
-                    <tr>
-                        <th>API Key:</th>
-                        <td>
-                            <input type="password" 
-                                   name="searchapi_key" 
-                                   value="<?php echo esc_attr($searchapi_key); ?>" 
-                                   class="regular-text"
-                                   dir="ltr"
-                                   style="font-family: monospace;">
-                            <p class="description">
-                                از <a href="https://searchapi.io" target="_blank">searchapi.io</a> دریافت کنید
-                            </p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th></th>
-                        <td>
-                            <button type="submit" name="test_searchapi" class="button">
-                                🧪 تست اتصال
-                            </button>
-                        </td>
-                    </tr>
-                </table>
-            </div>
-            
-            <div class="ns-settings-card">
-                <h2>تنظیمات ارزی</h2>
-                <table class="form-table">
-                    <tr>
-                        <th>نرخ USD (دستی):</th>
-                        <td>
-                            <input type="number" 
-                                   name="usd_rate" 
-                                   value="<?php echo esc_attr($usd_rate); ?>" 
-                                   class="small-text"
-                                   dir="ltr">
-                            <p class="description">
-                                اگر 0 باشد، از نرخ زنده استفاده می‌شود. عدد بگذارید تا ثابت شود.
-                            </p>
-                        </td>
-                    </tr>
-                </table>
-            </div>
-            
-            <p class="submit">
-                <button type="submit" name="save_providers" class="button button-primary button-large">
-                    💾 ذخیره تنظیمات
-                </button>
-            </p>
+                    
+                    <p class="submit">
+                        <button type="submit" name="save_provider_settings" class="button button-primary">ذخیره تنظیمات</button>
+                    </p>
                 </form>
+            </div>
         </div>
-        
-        <style>
-            .ns-settings-card {
-                background: #fff;
-                padding: 24px;
-                margin: 20px 0;
-                border-radius: 8px;
-                box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-                position: relative;
-            }
-            .ns-settings-card h2 {
-                margin-top: 0;
-                padding-bottom: 12px;
-                border-bottom: 2px solid #f0f0f0;
-            }
-            .ns-provider-status {
-                position: absolute;
-                top: 24px;
-                left: 24px;
-                padding: 6px 12px;
-                border-radius: 12px;
-                font-size: 12px;
-                font-weight: 600;
-            }
-            .ns-provider-status.active {
-                background: #46b450;
-                color: #fff;
-            }
-            .ns-provider-status.inactive {
-                background: #dc3232;
-                color: #fff;
-            }
-        </style>
         <?php
     }
 }

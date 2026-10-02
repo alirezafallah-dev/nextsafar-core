@@ -16,22 +16,11 @@ class AiTripSettings {
     const PAGE_SLUG = 'nextsafar-ai-trip';
 
     public static function init() {
-        add_action('admin_menu', [__CLASS__, 'add_menu']);
         add_action('admin_init', [__CLASS__, 'register_settings']);
         add_action('wp_ajax_ns_test_trip_key', [__CLASS__, 'ajax_test_key']);
     }
 
-    public static function add_menu() {
-        add_menu_page(
-            'تنظیمات برنامه‌ریز سفر AI',
-            'تنظیمات برنامه سفر',
-            'manage_options',
-            self::PAGE_SLUG,
-            [__CLASS__, 'render_page'],
-            'dashicons-location-alt',
-            58
-        );
-    }
+    // Menu registration moved to menu.php
 
     public static function register_settings() {
         register_setting('ns_ai_trip_group', AiTripGeminiClient::OPTION_KEY, [

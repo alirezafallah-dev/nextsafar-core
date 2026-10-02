@@ -157,6 +157,7 @@ require_once NEXTSAFAR_PATH . 'inc/admin/assets.php';
 require_once NEXTSAFAR_PATH . 'inc/admin/settings.php';
 require_once NEXTSAFAR_PATH . 'inc/admin/exchange.php';
 require_once NEXTSAFAR_PATH . 'inc/admin/live-search.php';
+require_once NEXTSAFAR_PATH . 'inc/admin/post-generator.php';
 require_once NEXTSAFAR_PATH . 'inc/admin/sync-page.php';
 require_once NEXTSAFAR_PATH . 'inc/admin/news-filter-settings.php';
 require_once NEXTSAFAR_PATH . 'inc/admin/menu.php';

@@ -17,27 +17,12 @@ class NewsFilterSettings {
     private static $registered = false;
 
     public static function init() {
-        add_action('admin_menu', [__CLASS__, 'add_page'], 20);
-
         // FIX: all AJAX actions + real handler.
         add_action('wp_ajax_nextsafar_get_filter_history', [__CLASS__, 'ajax_get_history']);
         add_action('wp_ajax_nextsafar_get_rejected_news', [__CLASS__, 'ajax_get_rejected']);
     }
 
-    public static function add_page() {
-        if (self::$registered) return;
-
-        self::$registered = true;
-
-        add_submenu_page(
-            'nextsafar-settings',
-            __('تنظیمات فیلتر اخبار', 'nextsafar'),
-            __('فیلتر اخبار', 'nextsafar'),
-            'manage_options',
-            self::PAGE_SLUG,
-            [__CLASS__, 'render_page']
-        );
-    }
+    // Page registration moved to menu.php
 
     public static function render_page(): void {
         if (!current_user_can('manage_options')) {
@@ -126,8 +111,7 @@ class NewsFilterSettings {
 
                             <p class="description">هر خط یک کلمه. این کلمات امتیاز مثبت به خبر می‌دهند.</p>
 
-                            <textarea name="positive_keywords" rows="10" class="large-text" style="font-family:monospace;"><?= esc_textarea(implode('
-', $keywords['positive'] ?? [])); ?></textarea>
+                            <textarea name="positive_keywords" rows="10" class="large-text" style="font-family:monospace;"><?= esc_textarea(implode("\n", $keywords['positive'] ?? [])); ?></textarea>
 
                             <p>
                                 <button type="submit" class="button button-primary">ذخیره کلمات مثبت</button>
@@ -145,8 +129,7 @@ class NewsFilterSettings {
 
                             <p class="description">هر خط یک کلمه. این کلمات امتیاز منفی به خبر می‌دهند.</p>
 
-                            <textarea name="negative_keywords" rows="10" class="large-text" style="font-family:monospace;"><?= esc_textarea(implode('
-', $keywords['negative'] ?? [])); ?></textarea>
+                            <textarea name="negative_keywords" rows="10" class="large-text" style="font-family:monospace;"><?= esc_textarea(implode("\n", $keywords['negative'] ?? [])); ?></textarea>
 
                             <p>
                                 <button type="submit" class="button button-secondary" style="background:#d63638;color:#fff;border-color:#d63638;">ذخیره کلمات منفی</button>
@@ -488,18 +471,14 @@ class NewsFilterSettings {
 
         $current_keywords = \NextSafar\API\NewsFilter::get_keywords();
 
-        $new_positive = $save_positive_only ? array_filter(array_map('trim', explode('
-', $positive_text))) : $current_keywords['positive'];
+        $new_positive = $save_positive_only ? array_filter(array_map('trim', explode("\n", $positive_text))) : $current_keywords['positive'];
 
-        $new_negative = $save_negative_only ? array_filter(array_map('trim', explode('
-', $negative_text))) : $current_keywords['negative'];
+        $new_negative = $save_negative_only ? array_filter(array_map('trim', explode("\n", $negative_text))) : $current_keywords['negative'];
 
         if (!$save_positive_only && !$save_negative_only) {
-            $new_positive = array_filter(array_map('trim', explode('
-', $positive_text)));
+            $new_positive = array_filter(array_map('trim', explode("\n", $positive_text)));
 
-            $new_negative = array_filter(array_map('trim', explode('
-', $negative_text)));
+            $new_negative = array_filter(array_map('trim', explode("\n", $negative_text)));
         }
 
         \NextSafar\API\NewsFilter::save_keywords(array_unique($new_positive), array_unique($new_negative));
