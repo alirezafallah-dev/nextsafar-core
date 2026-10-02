@@ -634,10 +634,6 @@ class NewsSync {
 
         ImageManager::ensure_featured_image($post_id, $featured, $item['link'] ?? '');
 
-        if (!empty($item['categories']) && is_array($item['categories'])) {
-            wp_set_object_terms($post_id, $item['categories'], 'travelnews_category');
-        }
-
         $this->duplicate_checker->mark_as_saved($item, $post_id);
 
         if ($processed) $this->ai_rewriter->log_final($post_id, $processed);

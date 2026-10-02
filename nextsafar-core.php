@@ -86,6 +86,7 @@ require_once NEXTSAFAR_PATH . 'inc/api/duplicate-checker.php';
 require_once NEXTSAFAR_PATH . 'inc/api/ai-rewriter.php';
 require_once NEXTSAFAR_PATH . 'inc/api/news-filter.php';
 require_once NEXTSAFAR_PATH . 'inc/api/news-sync.php';
+require_once NEXTSAFAR_PATH . 'inc/api/news-batch-sync.php';
 
 // ═══════════════════════════════════════════════════════════
 // 9. POST TYPES - Custom content types

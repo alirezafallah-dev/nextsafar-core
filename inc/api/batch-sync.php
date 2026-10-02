@@ -1,7 +1,7 @@
 <?php
-
 /**
- * BatchSync - Batch processing sync to prevent timeout
+ * NextSafar BatchSync
+ * Batch processing sync to prevent timeout
  */
 
 namespace NextSafar\API;
@@ -12,34 +12,38 @@ class BatchSync {
     const BATCH_SIZE = 10;
     const SYNC_STATE_KEY = 'nextsafar_sync_state';
 
+    /* ========================================================================
+       Start Sync
+       ======================================================================== */
     public static function start_sync(string $sync_type, string $location, string $source = 'searchapi', int $total_limit = 20): array {
+        do_action('nextsafar_skip_revalidation');
+
         $lock_key = 'ns_sync_lock_' . $sync_type;
 
-        /* ✅ Smart lock: auto-expire + detect stale lock */
+        // Handle stale locks
         $lock_time = get_transient($lock_key);
 
         if ($lock_time !== false) {
             $age = time() - (int) $lock_time;
 
             if ((int) $lock_time > 0 && $age > 900) {
-                /* Lock has been stuck for more than 15 minutes → previous sync is dead */
-                error_log("🧹 Stale sync lock cleared: {$lock_key} (age {$age}s)");
+                error_log("Stale sync lock cleared: {$lock_key} (age {$age}s)");
                 delete_transient($lock_key);
             } else {
-                wp_send_json_error(['message' => '❌ یک سینک از این نوع در حال اجرا است. لطفاً صبر کنید.']);
+                return ['success' => false, 'message' => 'یک سینک از این نوع در حال اجرا است. لطفاً صبر کنید.'];
             }
         }
 
-        /* Hard TTL 30 minutes: even if the process dies, the lock expires */
+        // Hard TTL: 30 minutes
         set_transient($lock_key, time(), 1800);
 
-        /* ✅ Release the lock if the process dies with a fatal error */
+        // Release lock on fatal error
         register_shutdown_function(function () use ($lock_key) {
             $err = error_get_last();
 
             if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
                 delete_transient($lock_key);
-                error_log('🔓 Sync lock released after fatal: ' . $lock_key);
+                error_log('Sync lock released after fatal: ' . $lock_key);
             }
         });
 
@@ -47,7 +51,6 @@ class BatchSync {
 
         if (!$client) {
             delete_transient($lock_key);
-
             return ['success' => false, 'message' => 'کلاینت معتبر نیست'];
         }
 
@@ -55,54 +58,55 @@ class BatchSync {
             $all_items = self::fetch_all_items($sync_type, $client, $location, $total_limit);
         } catch (\Exception $e) {
             delete_transient($lock_key);
-
             return ['success' => false, 'message' => 'خطا در دریافت لیست: ' . $e->getMessage()];
         }
 
         if (is_wp_error($all_items)) {
             delete_transient($lock_key);
-
             return ['success' => false, 'message' => $all_items->get_error_message()];
         }
 
         if (empty($all_items)) {
             delete_transient($lock_key);
-
             return ['success' => false, 'message' => 'هیچ آیتمی یافت نشد'];
         }
 
         $state = [
-            'sync_type'      => $sync_type,
-            'source'         => $source,
-            'location'       => $location,
-            'all_items'      => $all_items,
-            'total'          => count($all_items),
-            'processed'      => 0,
-            'created'        => 0,
-            'updated'        => 0,
-            'failed'         => 0,
-            'current_batch'  => 0,
-            'status'         => 'running',
-            'started_at'     => current_time('mysql'),
-            'lock_key'       => $lock_key,
+            'sync_type'     => $sync_type,
+            'source'        => $source,
+            'location'      => $location,
+            'all_items'     => $all_items,
+            'total'         => count($all_items),
+            'processed'     => 0,
+            'created'       => 0,
+            'updated'       => 0,
+            'failed'        => 0,
+            'current_batch' => 0,
+            'status'        => 'running',
+            'started_at'    => current_time('mysql'),
+            'lock_key'      => $lock_key,
         ];
 
         update_option(self::SYNC_STATE_KEY, $state, false);
 
         self::log_sync_start($sync_type, $source, count($all_items));
 
-        $batch_result = self::process_next_batch();
+        // Note: batches are processed by client via ajax_sync_batch
 
         return [
             'success'       => true,
             'total'         => count($all_items),
             'batch_size'    => self::BATCH_SIZE,
             'total_batches' => ceil(count($all_items) / self::BATCH_SIZE),
-            'batch_result'  => $batch_result,
         ];
     }
 
+    /* ========================================================================
+       Process Next Batch
+       ======================================================================== */
     public static function process_next_batch(): array {
+        do_action('nextsafar_skip_revalidation');
+
         $state = get_option(self::SYNC_STATE_KEY);
 
         if (!$state || $state['status'] !== 'running') {
@@ -121,38 +125,37 @@ class BatchSync {
         $items_to_process = array_slice($state['all_items'], $batch_start, self::BATCH_SIZE);
 
         if (empty($items_to_process)) {
-            $state['status'] = 'completed';
-            $state['completed_at'] = current_time('mysql');
-
-            update_option(self::SYNC_STATE_KEY, $state, false);
-
-            self::log_sync_complete($state);
-
-            if (!empty($state['lock_key'])) {
-                delete_transient($state['lock_key']);
-            }
-
-            return [
-                'completed'         => true,
-                'processed'         => $total,
-                'total'             => $total,
-                'progress_percent'  => 100,
-                'created'           => $state['created'],
-                'updated'           => $state['updated'],
-                'failed'            => $state['failed'],
-                'current_batch'     => $state['current_batch'],
-                'total_batches'     => ceil($total / self::BATCH_SIZE),
-            ];
+            return self::finish_sync($state);
         }
 
         $sync_instance = self::get_sync_instance($state['sync_type'], $state['source']);
 
-        foreach ($items_to_process as $item) {
+        // Track each item's result
+        $batch_details = [];
+
+        foreach ($items_to_process as $index => $item) {
+            $item_name = $item['name'] ?? $item['title'] ?? 'Item ' . ($batch_start + $index + 1);
+
+            $detail = [
+                'index'  => $batch_start + $index + 1,
+                'name'   => mb_substr($item_name, 0, 40),
+                'status' => 'processing',
+            ];
+
             $result = self::save_item($sync_instance, $state['sync_type'], $item, $state['location']);
 
-            if ($result === 'created') $state['created']++;
-            elseif ($result === 'updated') $state['updated']++;
-            else $state['failed']++;
+            if ($result === 'created') {
+                $state['created']++;
+                $detail['status'] = 'created';
+            } elseif ($result === 'updated') {
+                $state['updated']++;
+                $detail['status'] = 'updated';
+            } else {
+                $state['failed']++;
+                $detail['status'] = 'failed';
+            }
+
+            $batch_details[] = $detail;
         }
 
         $state['processed'] = $batch_end;
@@ -163,31 +166,58 @@ class BatchSync {
         $is_completed = $batch_end >= $total;
 
         if ($is_completed) {
-            $state['status'] = 'completed';
-            $state['completed_at'] = current_time('mysql');
-
-            update_option(self::SYNC_STATE_KEY, $state, false);
-
-            self::log_sync_complete($state);
-
-            if (!empty($state['lock_key'])) {
-                delete_transient($state['lock_key']);
-            }
+            self::finish_sync($state);
         }
 
         return [
-            'completed'         => $is_completed,
-            'processed'         => $batch_end,
-            'total'             => $total,
-            'progress_percent'  => $total > 0 ? round(($batch_end / $total) * 100) : 0,
-            'created'           => $state['created'],
-            'updated'           => $state['updated'],
-            'failed'            => $state['failed'],
-            'current_batch'     => $state['current_batch'],
-            'total_batches'     => ceil($total / self::BATCH_SIZE),
+            'completed'        => $is_completed,
+            'processed'        => $batch_end,
+            'total'            => $total,
+            'progress_percent' => $total > 0 ? round(($batch_end / $total) * 100) : 0,
+            'created'          => $state['created'],
+            'updated'          => $state['updated'],
+            'failed'           => $state['failed'],
+            'current_batch'    => $state['current_batch'],
+            'total_batches'    => ceil($total / self::BATCH_SIZE),
+            'batch_details'    => $batch_details,
+            'sync_type'        => $state['sync_type'],
         ];
     }
 
+    /* ========================================================================
+       Finish Sync
+       ======================================================================== */
+    private static function finish_sync(array $state): array {
+        $state['status'] = 'completed';
+        $state['completed_at'] = current_time('mysql');
+
+        update_option(self::SYNC_STATE_KEY, $state, false);
+
+        self::log_sync_complete($state);
+
+        if (!empty($state['lock_key'])) {
+            delete_transient($state['lock_key']);
+        }
+
+        do_action('nextsafar_enable_revalidation');
+
+        return [
+            'completed'        => true,
+            'processed'        => $state['total'],
+            'total'            => $state['total'],
+            'progress_percent' => 100,
+            'created'          => $state['created'],
+            'updated'          => $state['updated'],
+            'failed'           => $state['failed'],
+            'current_batch'    => $state['current_batch'],
+            'total_batches'    => ceil($state['total'] / self::BATCH_SIZE),
+            'sync_type'        => $state['sync_type'],
+        ];
+    }
+
+    /* ========================================================================
+       Get Status
+       ======================================================================== */
     public static function get_status(): array {
         $state = get_option(self::SYNC_STATE_KEY);
 
@@ -207,6 +237,9 @@ class BatchSync {
         ];
     }
 
+    /* ========================================================================
+       Cancel Sync
+       ======================================================================== */
     public static function cancel_sync(): bool {
         $state = get_option(self::SYNC_STATE_KEY);
 
@@ -221,27 +254,26 @@ class BatchSync {
         return true;
     }
 
+    /* ========================================================================
+       Helpers
+       ======================================================================== */
     private static function get_client(string $sync_type, string $source) {
-        $key = '';
-
         if ($source === 'serpapi') {
             $key = get_option('nextsafar_serpapi_key', '');
-
             return new SerpApiClient($key);
-        } else {
-            $key = get_option('nextsafar_searchapi_key', '');
-
-            return new SearchApiClient($key);
         }
+
+        $key = get_option('nextsafar_searchapi_key', '');
+        return new SearchApiClient($key);
     }
 
     private static function get_sync_instance(string $sync_type, string $source) {
         switch ($sync_type) {
             case 'destination': return new DestinationSync($source);
-            case 'restaurant': return new RestaurantSync($source);
-            case 'hospital': return new HospitalSync($source);
+            case 'restaurant':  return new RestaurantSync($source);
+            case 'hospital':    return new HospitalSync($source);
             case 'hotel':
-            default: return new HotelSync($source);
+            default:            return new HotelSync($source);
         }
     }
 
@@ -249,11 +281,11 @@ class BatchSync {
         $options = ['limit' => $limit];
 
         switch ($sync_type) {
-            case 'hotel': return $client->search_hotels($location, $options);
+            case 'hotel':       return $client->search_hotels($location, $options);
             case 'destination': return $client->search_destinations($location, $options);
-            case 'restaurant': return $client->search_restaurants($location, $options);
-            case 'hospital': return $client->search_hospitals($location, $options);
-            default: return new \WP_Error('invalid_type', 'نوع سینک معتبر نیست: ' . $sync_type);
+            case 'restaurant':  return $client->search_restaurants($location, $options);
+            case 'hospital':    return $client->search_hospitals($location, $options);
+            default:            return new \WP_Error('invalid_type', 'نوع سینک معتبر نیست: ' . $sync_type);
         }
     }
 
@@ -261,36 +293,30 @@ class BatchSync {
         $item['search_location'] = $location;
 
         try {
-            switch ($sync_type) {
-                case 'hotel':
-                    $reflection = new \ReflectionMethod($sync_instance, 'save_hotel');
-                    $reflection->setAccessible(true);
-                    return $reflection->invoke($sync_instance, $item);
+            $method_map = [
+                'hotel'       => 'save_hotel',
+                'destination' => 'save_destination',
+                'restaurant'  => 'save_restaurant',
+                'hospital'    => 'save_hospital',
+            ];
 
-                case 'destination':
-                    $reflection = new \ReflectionMethod($sync_instance, 'save_destination');
-                    $reflection->setAccessible(true);
-                    return $reflection->invoke($sync_instance, $item);
+            $method = $method_map[$sync_type] ?? null;
 
-                case 'restaurant':
-                    $reflection = new \ReflectionMethod($sync_instance, 'save_restaurant');
-                    $reflection->setAccessible(true);
-                    return $reflection->invoke($sync_instance, $item);
+            if (!$method) return 'failed';
 
-                case 'hospital':
-                    $reflection = new \ReflectionMethod($sync_instance, 'save_hospital');
-                    $reflection->setAccessible(true);
-                    return $reflection->invoke($sync_instance, $item);
+            $reflection = new \ReflectionMethod($sync_instance, $method);
+            $reflection->setAccessible(true);
 
-                default: return 'failed';
-            }
+            return $reflection->invoke($sync_instance, $item);
         } catch (\Exception $e) {
-            error_log('❌ save_item exception: ' . $e->getMessage());
-
+            error_log('save_item exception: ' . $e->getMessage());
             return 'failed';
         }
     }
 
+    /* ========================================================================
+       Logging
+       ======================================================================== */
     private static function log_sync_start(string $sync_type, string $source, int $total): void {
         global $wpdb;
 
@@ -301,8 +327,7 @@ class BatchSync {
         }
 
         if ($wpdb->get_var("SHOW TABLES LIKE '{$table}'") !== $table) {
-            error_log('❌ api_sync_log table does not exist');
-
+            error_log('api_sync_log table does not exist');
             return;
         }
 
@@ -325,11 +350,11 @@ class BatchSync {
         $wpdb->update(
             $table,
             [
-                'status'            => $state['failed'] > 0 ? 'partial' : 'completed',
-                'records_created'   => $state['created'],
-                'records_updated'   => $state['updated'],
-                'records_failed'    => $state['failed'],
-                'completed_at'      => current_time('mysql'),
+                'status'          => $state['failed'] > 0 ? 'partial' : 'completed',
+                'records_created' => $state['created'],
+                'records_updated' => $state['updated'],
+                'records_failed'  => $state['failed'],
+                'completed_at'    => current_time('mysql'),
             ],
             [
                 'source'      => $state['source'],

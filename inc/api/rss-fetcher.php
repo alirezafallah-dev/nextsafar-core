@@ -1,10 +1,7 @@
 <?php
-
 /**
- * NextSafar RSS Fetcher — Version 2.2
- * - Time window (Note 1): Items older than X hours are not parsed at all
- * - Video extraction (Note 5)
- * - Fixed og:image and img regexes with capture groups
+ * NextSafar RSS Fetcher
+ * Fetches news from RSS feeds with time window filtering
  */
 
 namespace NextSafar\API;
@@ -15,8 +12,8 @@ require_once __DIR__ . '/rate-limiter.php';
 
 class RSSFetcher {
     private $timeout = 20;
-    private $user_agent = 'NextSafar/1.1 (+https://nextsafar.com)';
-    private $cutoff_ts = 0;   /* Time window */
+    private $user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 NextSafar/3.0';
+    private $cutoff_ts = 0;
 
     /* ========================================================================
        Fetch All Feeds
@@ -27,7 +24,7 @@ class RSSFetcher {
         $table = $wpdb->prefix . 'ns_news_sources';
 
         if ($wpdb->get_var("SHOW TABLES LIKE '{$table}'") !== $table) {
-            error_log('❌ ns_news_sources table does not exist');
+            error_log('ns_news_sources table does not exist');
             return [];
         }
 
@@ -43,14 +40,14 @@ class RSSFetcher {
 
         foreach ($feeds as $feed) {
             if ($errors_count >= $max_errors) {
-                error_log('⚠️ Too many RSS errors, stopping fetch');
+                error_log('Too many RSS errors, stopping fetch');
                 break;
             }
 
             try {
                 RateLimiter::wait_if_needed('rss', 1.0);
 
-                $items = $this->fetch_feed($feed);
+                $items = $this->fetch_feed($feed->url, $feed->name);
 
                 $all_news = array_merge($all_news, $items);
 
@@ -68,11 +65,11 @@ class RSSFetcher {
                     'error_message' => mb_substr($e->getMessage(), 0, 500),
                 ], ['id' => $feed->id]);
 
-                error_log("❌ RSS Fetch Error [{$feed->name}]: " . $e->getMessage());
+                error_log("RSS Fetch Error [{$feed->name}]: " . $e->getMessage());
             }
         }
 
-        error_log('✅ RSS Fetch completed: ' . count($all_news) . ' fresh items (window ' . $max_age_hours . 'h) from ' . count($feeds) . ' feeds');
+        error_log('RSS Fetch completed: ' . count($all_news) . ' items from ' . count($feeds) . ' feeds');
 
         return $all_news;
     }
@@ -80,241 +77,136 @@ class RSSFetcher {
     /* ========================================================================
        Fetch Single Feed
        ======================================================================== */
-    private function fetch_feed($feed): array {
-        $response = wp_remote_get($feed->url, [
-            'timeout'    => $this->timeout,
-            'user-agent' => $this->user_agent,
-            'headers'    => ['Accept' => 'application/rss+xml, application/xml, text/xml'],
-            'sslverify'  => false,
-        ]);
-
-        if (is_wp_error($response)) throw new \Exception('HTTP Error: ' . $response->get_error_message());
-
-        $status = wp_remote_retrieve_response_code($response);
-
-        if ($status !== 200) throw new \Exception("HTTP {$status}");
-
-        $xml = mb_convert_encoding(wp_remote_retrieve_body($response), 'UTF-8', 'auto');
-
-        libxml_use_internal_errors(true);
-
-        $rss = simplexml_load_string($xml, 'SimpleXMLElement', LIBXML_NOCDATA);
-
-        if ($rss === false) throw new \Exception('Invalid XML');
-
-        return $this->parse_rss($rss, $feed);
-    }
-
-    /* ========================================================================
-       Parse RSS/Atom
-       ======================================================================== */
-    private function parse_rss($rss, $feed): array {
+    private function fetch_feed(string $url, string $source_name): array {
         $items = [];
 
-        if (isset($rss->channel->item)) {
-            foreach ($rss->channel->item as $item) {
-                $p = $this->parse_rss_item($item, $feed);
-                if ($p) $items[] = $p;
-            }
-        } elseif (isset($rss->entry)) {
-            foreach ($rss->entry as $entry) {
-                $p = $this->parse_atom_entry($entry, $feed);
-                if ($p) $items[] = $p;
-            }
+        // Browser-like headers to avoid 403 errors
+        $response = wp_remote_get($url, [
+            'timeout'    => $this->timeout,
+            'user-agent' => $this->user_agent,
+            'headers'    => [
+                'Accept'          => 'application/rss+xml, application/xml, text/xml, */*',
+                'Accept-Language' => 'en-US,en;q=0.9,fa;q=0.8',
+            ],
+        ]);
+
+        if (is_wp_error($response)) {
+            error_log('RSS Fetch Error [' . $source_name . ']: ' . $response->get_error_message());
+            return [];
+        }
+
+        $code = wp_remote_retrieve_response_code($response);
+
+        if ($code !== 200) {
+            error_log('RSS Fetch Error [' . $source_name . ']: HTTP ' . $code);
+            return [];
+        }
+
+        $body = wp_remote_retrieve_body($response);
+
+        if (empty($body)) {
+            error_log('RSS Feed empty [' . $source_name . ']');
+            return [];
+        }
+
+        // Parse with SimplePie
+        $feed = new \SimplePie();
+        $feed->set_raw_data($body);
+        $feed->enable_cache(false);
+        $feed->init();
+
+        if ($feed->error()) {
+            error_log('RSS Parse Error [' . $source_name . ']: ' . $feed->error());
+            return [];
+        }
+
+        foreach ($feed->get_items() as $item) {
+            $pub_date = $item->get_date('Y-m-d H:i:s');
+
+            // Skip items outside time window
+            if (!$this->in_window($pub_date)) continue;
+
+            $content = $item->get_content();
+
+            $items[] = [
+                'title'        => $this->clean_text($item->get_title()),
+                'content'      => $this->clean_html($content),
+                'excerpt'      => $this->extract_excerpt($item->get_description(), $content),
+                'link'         => $item->get_link(),
+                'pub_date'     => $pub_date,
+                'source_name'  => $source_name,
+                'source_group' => 'rss',
+                'fetch_type'   => 'rss',
+                'guid'         => $item->get_id() ?: $item->get_link(),
+                'image'        => $this->extract_first_image($item),
+                'video'        => $this->extract_video($content),
+                'categories'   => $this->extract_categories($item),
+            ];
         }
 
         return $items;
     }
 
     /* ========================================================================
-       Items Older Than Time Window Are Rejected
+       Time Window Filter
        ======================================================================== */
     private function in_window(?string $pub_date): bool {
         $ts = $pub_date ? strtotime($pub_date) : time();
-
         return $ts >= $this->cutoff_ts;
     }
 
     /* ========================================================================
-       Parse RSS Item
+       Extract First Image
        ======================================================================== */
-    private function parse_rss_item($item, $feed): ?array {
-        $namespaces = $item->getNameSpaces(true);
+    private function extract_first_image($item): ?string {
+        // Try enclosure
+        $enclosure = $item->get_enclosure();
 
-        $dc      = isset($namespaces['dc'])      ? $item->children($namespaces['dc'])      : null;
-        $media   = isset($namespaces['media'])   ? $item->children($namespaces['media'])   : null;
-        $content = isset($namespaces['content']) ? $item->children($namespaces['content']) : null;
+        if ($enclosure && $enclosure->get_type() && strpos($enclosure->get_type(), 'image') !== false) {
+            return $enclosure->get_link();
+        }
 
-        $link  = (string) $item->link;
-        $title = (string) $item->title;
+        // Try media thumbnail
+        if ($enclosure && $enclosure->get_thumbnail()) {
+            return $enclosure->get_thumbnail();
+        }
 
-        if (empty($link) || empty($title)) return null;
+        // Try first img in content
+        $content = $item->get_content();
 
-        $pub_date = (string) $item->pubDate;
+        if (preg_match('/<img[^>]+src=[\'"]([^\'"]+)[\'"]/i', $content, $m)) {
+            return $m[1];
+        }
 
-        if (!$this->in_window($pub_date)) return null;   /* Time window */
-
-        $description     = (string) $item->description;
-        $content_encoded = $content ? (string) $content->encoded : '';
-        $guid            = (string) $item->guid;
-
-        $image = $this->extract_image($item, $media, $link);
-
-        $full  = !empty($content_encoded) ? $content_encoded : $description;
-
-        return [
-            'source_name'  => $feed->name,
-            'source_id'    => $feed->id,
-            'source_group' => $feed->group_name,
-            'title'        => $this->clean_text($title),
-            'link'         => trim($link),
-            'guid'         => !empty($guid) ? trim($guid) : trim($link),
-            'excerpt'      => $this->extract_excerpt($description, $full),
-            'content'      => $this->clean_html($full),
-            'image'        => $image,
-            'video'        => $this->extract_video($item, $media, $full),   /* Note 5 */
-            'pub_date'     => date('Y-m-d H:i:s', strtotime($pub_date)),
-            'author'       => $dc ? (string) $dc->creator : '',
-            'categories'   => $this->extract_categories($item),
-            'fetch_type'   => 'rss',
-        ];
+        return null;
     }
 
     /* ========================================================================
-       Parse Atom Entry
+       Extract Video
        ======================================================================== */
-    private function parse_atom_entry($entry, $feed): ?array {
-        $link = '';
-
-        foreach ($entry->link as $l) {
-            if ((string) $l['rel'] === 'alternate' || empty((string) $l['rel'])) {
-                $link = (string) $l['href'];
-                break;
-            }
-        }
-
-        $title = (string) $entry->title;
-
-        if (empty($link) || empty($title)) return null;
-
-        $pub_date = (string) ($entry->published ?: $entry->updated);
-
-        if (!$this->in_window($pub_date)) return null;   /* Time window */
-
-        $summary = (string) $entry->summary;
-        $content = isset($entry->content) ? (string) $entry->content : '';
-        $full    = !empty($content) ? $content : $summary;
-        $id      = (string) $entry->id;
-
-        return [
-            'source_name'  => $feed->name,
-            'source_id'    => $feed->id,
-            'source_group' => $feed->group_name,
-            'title'        => $this->clean_text($title),
-            'link'         => trim($link),
-            'guid'         => !empty($id) ? trim($id) : trim($link),
-            'excerpt'      => $this->extract_excerpt($summary, $full),
-            'content'      => $this->clean_html($full),
-            'image'        => $this->fetch_og_image($link),
-            'video'        => $this->extract_video(null, null, $full),
-            'pub_date'     => date('Y-m-d H:i:s', strtotime($pub_date)),
-            'author'       => isset($entry->author->name) ? (string) $entry->author->name : '',
-            'categories'   => [],
-            'fetch_type'   => 'rss',
-        ];
-    }
-
-    /* ========================================================================
-       Extract Image (Fixed Regex)
-       ======================================================================== */
-    private function extract_image($item, $media, string $original_url): ?string {
-        if ($media) {
-            if (isset($media->content) && !empty($media->content['url']))   return (string) $media->content['url'];
-            if (isset($media->thumbnail) && !empty($media->thumbnail['url'])) return (string) $media->thumbnail['url'];
-        }
-
-        if ($item && isset($item->enclosure) && !empty($item->enclosure['url'])) {
-            if (strpos((string) $item->enclosure['type'], 'image') !== false) return (string) $item->enclosure['url'];
-        }
-
-        if ($item) {
-            $desc = (string) $item->description;
-
-            /* Has capture group */
-            if (preg_match('/<img[^>]+src=[\'"]([^\'"]+)[\'"]/i', $desc, $m)) return $m[1];
-        }
-
-        return $this->fetch_og_image($original_url);
-    }
-
-    /* ========================================================================
-       Fetch OG Image
-       ======================================================================== */
-    private function fetch_og_image(string $url): ?string {
-        $cache_key = 'ns_og_' . md5($url);
-
-        $cached = get_transient($cache_key);
-
-        if ($cached !== false) return $cached ?: null;
-
-        $response = wp_remote_get($url, [
-            'timeout' => 10, 'user-agent' => $this->user_agent, 'redirection' => 3, 'sslverify' => false,
-        ]);
-
-        if (is_wp_error($response)) {
-            set_transient($cache_key, '', HOUR_IN_SECONDS);
-            return null;
-        }
-
-        $html  = wp_remote_retrieve_body($response);
-        $image = null;
-
-        /* All three patterns have capture groups */
-        if (preg_match('/<meta[^>]+property=[\'"]og:image[\'"][^>]+content=[\'"]([^\'"]+)[\'"]/i', $html, $m)) {
-            $image = $m[1];
-        } elseif (preg_match('/<meta[^>]+content=[\'"]([^\'"]+)[\'"][^>]+property=[\'"]og:image[\'"]/i', $html, $m)) {
-            $image = $m[1];
-        } elseif (preg_match('/<meta[^>]+name=[\'"]twitter:image[\'"][^>]+content=[\'"]([^\'"]+)[\'"]/i', $html, $m)) {
-            $image = $m[1];
-        }
-
-        set_transient($cache_key, $image ?: '', DAY_IN_SECONDS);
-
-        return $image;
-    }
-
-    /* ========================================================================
-       Extract Video (Note 5)
-       ======================================================================== */
-    private function extract_video($item, $media, string $content): string {
-        /* 1) Video enclosure */
-        if ($item && isset($item->enclosure) && !empty($item->enclosure['url'])) {
-            if (strpos((string) $item->enclosure['type'], 'video') !== false) return (string) $item->enclosure['url'];
-        }
-
-        /* 2) media:content / media:player video */
-        if ($media) {
-            if (isset($media->content)) {
-                foreach ($media->content as $mc) {
-                    $type = (string) $mc['type'];
-                    $medium = (string) $mc['medium'];
-
-                    if (strpos($type, 'video') !== false || $medium === 'video') {
-                        $u = (string) $mc['url'];
-                        if ($u) return $u;
-                    }
-                }
-            }
-
-            if (isset($media->player) && !empty($media->player['url'])) return (string) $media->player['url'];
-        }
-
-        /* 3) YouTube/Aparat link inside content */
+    private function extract_video(string $content): string {
         if (preg_match('~https?://(?:www\.)?(?:youtube\.com/watch\?v=[\w-]+|youtu\.be/[\w-]+|aparat\.com/v/[\w-]+)~i', $content, $m)) {
             return $m[0];
         }
 
         return '';
+    }
+
+    /* ========================================================================
+       Extract Categories
+       ======================================================================== */
+    private function extract_categories($item): array {
+        $cats = [];
+        $categories = $item->get_categories();
+
+        if (is_array($categories)) {
+            foreach ($categories as $cat) {
+                $label = $cat->get_label();
+                if (!empty($label)) $cats[] = $label;
+            }
+        }
+
+        return $cats;
     }
 
     /* ========================================================================
@@ -328,26 +220,15 @@ class RSSFetcher {
         if (mb_strlen($text) > 250) {
             $text = mb_substr($text, 0, 250);
             $sp = mb_strrpos($text, ' ');
-
             if ($sp !== false) $text = mb_substr($text, 0, $sp);
-
             $text .= '...';
         }
 
         return $text;
     }
 
-    private function extract_categories($item): array {
-        $cats = [];
-
-        foreach ($item->category as $cat) $cats[] = (string) $cat;
-
-        return $cats;
-    }
-
     private function clean_text(string $text): string {
         $text = html_entity_decode($text, ENT_QUOTES, 'UTF-8');
-
         return trim(preg_replace('/\s+/', ' ', strip_tags($text)));
     }
 
