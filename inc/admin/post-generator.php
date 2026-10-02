@@ -314,34 +314,24 @@ class PostGenerator {
     }
     
     /**
-     * Settings page - includes hotel/destination sync settings
+     * Settings page - API keys only
      */
     public static function render_settings_page(): void {
         if (!current_user_can('manage_options')) return;
         
         $message = '';
         
-        // Save settings
-        if (isset($_POST['save_pg_settings']) && check_admin_referer('nextsafar_pg_settings')) {
-            update_option('nextsafar_pg_auto_publish', isset($_POST['auto_publish']) ? '1' : '0');
-            update_option('nextsafar_pg_default_status', sanitize_text_field($_POST['default_status'] ?? 'draft'));
-            update_option('nextsafar_pg_image_source', sanitize_text_field($_POST['image_source'] ?? 'search'));
-            update_option('nextsafar_pg_hotel_enabled', isset($_POST['hotel_enabled']) ? '1' : '0');
-            update_option('nextsafar_pg_destination_enabled', isset($_POST['destination_enabled']) ? '1' : '0');
-            update_option('nextsafar_pg_restaurant_enabled', isset($_POST['restaurant_enabled']) ? '1' : '0');
-            update_option('nextsafar_pg_hospital_enabled', isset($_POST['hospital_enabled']) ? '1' : '0');
-            update_option('nextsafar_pg_default_limit', absint($_POST['default_limit'] ?? 20));
-            $message = 'تنظیمات ذخیره شد';
+        // Save API settings
+        if (isset($_POST['save_pg_api_settings']) && check_admin_referer('nextsafar_pg_api_settings')) {
+            update_option('nextsafar_searchapi_key', sanitize_text_field($_POST['nextsafar_searchapi_key'] ?? ''));
+            update_option('nextsafar_serpapi_key', sanitize_text_field($_POST['nextsafar_serpapi_key'] ?? ''));
+            update_option('nextsafar_active_source', sanitize_text_field($_POST['nextsafar_active_source'] ?? 'searchapi'));
+            $message = 'کلیدهای اتصال ذخیره شد';
         }
         
-        $auto_publish = get_option('nextsafar_pg_auto_publish', '0');
-        $default_status = get_option('nextsafar_pg_default_status', 'draft');
-        $image_source = get_option('nextsafar_pg_image_source', 'search');
-        $hotel_enabled = get_option('nextsafar_pg_hotel_enabled', '1');
-        $destination_enabled = get_option('nextsafar_pg_destination_enabled', '1');
-        $restaurant_enabled = get_option('nextsafar_pg_restaurant_enabled', '1');
-        $hospital_enabled = get_option('nextsafar_pg_hospital_enabled', '0');
-        $default_limit = get_option('nextsafar_pg_default_limit', 20);
+        $searchapi_key = get_option('nextsafar_searchapi_key', '');
+        $serpapi_key = get_option('nextsafar_serpapi_key', '');
+        $active_source = get_option('nextsafar_active_source', 'searchapi');
         ?>
         <div class="wrap">
             <h1>تنظیمات تولید پست هوشمند</h1>
@@ -350,99 +340,41 @@ class PostGenerator {
                 <div class="notice notice-success is-dismissible"><p><?php echo esc_html($message); ?></p></div>
             <?php endif; ?>
             
-            <form method="post">
-                <?php wp_nonce_field('nextsafar_pg_settings'); ?>
-                
-                <!-- Content Type Settings -->
-                <div style="background:#fff;padding:24px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);margin-bottom:20px;">
-                    <h2>انواع محتوا</h2>
+            <!-- API Keys Section -->
+            <div style="background:#fff;padding:24px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);margin-bottom:20px;">
+                <h2>کلیدهای اتصال</h2>
+                <form method="post">
+                    <?php wp_nonce_field('nextsafar_pg_api_settings'); ?>
                     <table class="form-table">
                         <tr>
-                            <th>هتل‌ها:</th>
+                            <th>کلید سرچ‌ای‌پی‌آی:</th>
                             <td>
-                                <label>
-                                    <input type="checkbox" name="hotel_enabled" value="1" <?php checked($hotel_enabled, '1'); ?>>
-                                    همگام‌سازی هتل‌ها فعال باشد
-                                </label>
+                                <input type="password" name="nextsafar_searchapi_key" value="<?php echo esc_attr($searchapi_key); ?>" class="regular-text" dir="ltr" autocomplete="off">
+                                <p class="description">از سایت سرچ‌ای‌پی‌آی‌آیو دریافت کنید</p>
                             </td>
                         </tr>
                         <tr>
-                            <th>مقاصد گردشگری:</th>
+                            <th>کلید سرپ‌ای‌پی‌آی:</th>
                             <td>
-                                <label>
-                                    <input type="checkbox" name="destination_enabled" value="1" <?php checked($destination_enabled, '1'); ?>>
-                                    همگام‌سازی مقاصد فعال باشد
-                                </label>
+                                <input type="password" name="nextsafar_serpapi_key" value="<?php echo esc_attr($serpapi_key); ?>" class="regular-text" dir="ltr" autocomplete="off">
+                                <p class="description">از سایت سرپ‌ای‌پی‌آی‌آیو دریافت کنید</p>
                             </td>
                         </tr>
                         <tr>
-                            <th>رستوران‌ها:</th>
+                            <th>منبع فعال:</th>
                             <td>
-                                <label>
-                                    <input type="checkbox" name="restaurant_enabled" value="1" <?php checked($restaurant_enabled, '1'); ?>>
-                                    همگام‌سازی رستوران‌ها فعال باشد
-                                </label>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>بیمارستان‌ها:</th>
-                            <td>
-                                <label>
-                                    <input type="checkbox" name="hospital_enabled" value="1" <?php checked($hospital_enabled, '1'); ?>>
-                                    همگام‌سازی بیمارستان‌ها فعال باشد
-                                </label>
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-                
-                <!-- General Settings -->
-                <div style="background:#fff;padding:24px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);margin-bottom:20px;">
-                    <h2>تنظیمات عمومی</h2>
-                    <table class="form-table">
-                        <tr>
-                            <th>انتشار خودکار:</th>
-                            <td>
-                                <label>
-                                    <input type="checkbox" name="auto_publish" value="1" <?php checked($auto_publish, '1'); ?>>
-                                    پست‌های تولید شده به صورت خودکار منتشر شوند
-                                </label>
-                                <p class="description">اگر غیرفعال باشد، پست‌ها به صورت پیش‌نویس ذخیره می‌شوند</p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>وضعیت پیش‌فرض پست:</th>
-                            <td>
-                                <select name="default_status">
-                                    <option value="draft" <?php selected($default_status, 'draft'); ?>>پیش‌نویس</option>
-                                    <option value="publish" <?php selected($default_status, 'publish'); ?>>انتشار</option>
-                                    <option value="pending" <?php selected($default_status, 'pending'); ?>>در انتظار بررسی</option>
+                                <select name="nextsafar_active_source">
+                                    <option value="searchapi" <?php selected($active_source, 'searchapi'); ?>>سرچ‌ای‌پی‌آی</option>
+                                    <option value="serpapi" <?php selected($active_source, 'serpapi'); ?>>سرپ‌ای‌پی‌آی</option>
                                 </select>
                             </td>
                         </tr>
-                        <tr>
-                            <th>منبع تصاویر:</th>
-                            <td>
-                                <select name="image_source">
-                                    <option value="search" <?php selected($image_source, 'search'); ?>>جستجو از گوگل</option>
-                                    <option value="api" <?php selected($image_source, 'api'); ?>>از منبع داده</option>
-                                    <option value="none" <?php selected($image_source, 'none'); ?>>بدون تصویر</option>
-                                </select>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>تعداد پیش‌فرض نتایج:</th>
-                            <td>
-                                <input type="number" name="default_limit" value="<?php echo esc_attr($default_limit); ?>" min="1" max="100" class="small-text">
-                            </td>
-                        </tr>
                     </table>
-                </div>
-                
-                <p class="submit">
-                    <button type="submit" name="save_pg_settings" class="button button-primary">ذخیره تنظیمات</button>
-                </p>
-            </form>
+                    <p class="submit">
+                        <button type="submit" name="save_pg_api_settings" class="button button-primary">ذخیره کلیدهای اتصال</button>
+                    </p>
+                </form>
+            </div>
         </div>
         <?php
     }

@@ -1,7 +1,7 @@
 <?php
 /**
- * NextSafar Settings - News API Settings Only
- * Hotel/Destination sync settings moved to post-generator.php
+ * NextSafar Settings - News Settings Only
+ * API keys moved to post-generator.php
  */
 
 namespace NextSafar\Admin;
@@ -11,23 +11,11 @@ if (!defined('ABSPATH')) exit;
 class Settings {
     public static function render_settings_page(): void {
         /* ========================================================================
-           Save API Settings
-           ======================================================================== */
-        if (isset($_POST['save_nextsafar_api_settings']) && check_admin_referer('nextsafar_api_settings_action')) {
-            update_option('nextsafar_searchapi_key', sanitize_text_field($_POST['nextsafar_searchapi_key'] ?? ''));
-            update_option('nextsafar_serpapi_key', sanitize_text_field($_POST['nextsafar_serpapi_key'] ?? ''));
-            update_option('nextsafar_active_source', sanitize_text_field($_POST['nextsafar_active_source'] ?? 'searchapi'));
-
-            echo '<div class="updated"><p>تنظیمات ذخیره شد.</p></div>';
-        }
-
-        /* ========================================================================
            Save News Settings
            ======================================================================== */
         if (isset($_POST['save_news_settings']) && check_admin_referer('nextsafar_news_settings')) {
             update_option('nextsafar_news_auto', isset($_POST['news_auto']) ? '1' : '0');
 
-            // Automatic hours.
             $hours = [];
             if (isset($_POST['sync_hours'])) {
                 foreach ($_POST['sync_hours'] as $h) {
@@ -39,20 +27,13 @@ class Settings {
             }
             update_option('nextsafar_news_sync_hours', $hours);
 
-            // Publish caps.
             update_option('nextsafar_news_max_publish_per_run', absint($_POST['max_publish_per_run'] ?? 5));
             update_option('nextsafar_news_max_draft_per_run', absint($_POST['max_draft_per_run'] ?? 3));
             update_option('nextsafar_news_max_ai_review_per_run', absint($_POST['max_ai_review_per_run'] ?? 2));
-
-            // Time window.
             update_option('nextsafar_news_time_window_hours', absint($_POST['time_window_hours'] ?? 24));
 
             echo '<div class="updated"><p>تنظیمات اخبار ذخیره شد.</p></div>';
         }
-
-        $searchapi_key = get_option('nextsafar_searchapi_key', '');
-        $serpapi_key = get_option('nextsafar_serpapi_key', '');
-        $active_source = get_option('nextsafar_active_source', 'searchapi');
 
         $news_auto = get_option('nextsafar_news_auto', '0');
         $sync_hours = get_option('nextsafar_news_sync_hours', [8, 12, 18]);
@@ -63,42 +44,6 @@ class Settings {
         ?>
         <div class="wrap">
             <h1>تنظیمات عمومی اخبار</h1>
-
-            <!-- API Settings -->
-            <div style="background:#fff;padding:24px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);margin-bottom:20px;">
-                <h2>کلیدهای اتصال</h2>
-                <form method="post">
-                    <?php wp_nonce_field('nextsafar_api_settings_action'); ?>
-                    <table class="form-table">
-                        <tr>
-                            <th>کلید سرچ‌ای‌پی‌آی:</th>
-                            <td>
-                                <input type="password" name="nextsafar_searchapi_key" value="<?php echo esc_attr($searchapi_key); ?>" class="regular-text" dir="ltr" autocomplete="off">
-                                <p class="description">از سایت سرچ‌ای‌پی‌آی‌آیو دریافت کنید</p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>کلید سرپ‌ای‌پی‌آی:</th>
-                            <td>
-                                <input type="password" name="nextsafar_serpapi_key" value="<?php echo esc_attr($serpapi_key); ?>" class="regular-text" dir="ltr" autocomplete="off">
-                                <p class="description">از سایت سرپ‌ای‌پی‌آی‌آیو دریافت کنید</p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>منبع فعال:</th>
-                            <td>
-                                <select name="nextsafar_active_source">
-                                    <option value="searchapi" <?php selected($active_source, 'searchapi'); ?>>سرچ‌ای‌پی‌آی</option>
-                                    <option value="serpapi" <?php selected($active_source, 'serpapi'); ?>>سرپ‌ای‌پی‌آی</option>
-                                </select>
-                            </td>
-                        </tr>
-                    </table>
-                    <p class="submit">
-                        <button type="submit" name="save_nextsafar_api_settings" class="button button-primary">ذخیره تنظیمات</button>
-                    </p>
-                </form>
-            </div>
 
             <!-- News Settings -->
             <div style="background:#fff;padding:24px;border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.1);margin-bottom:20px;">
