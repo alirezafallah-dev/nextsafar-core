@@ -10,7 +10,17 @@ if (!defined('ABSPATH')) exit;
 
 require_once __DIR__ . '/rate-limiter.php';
 
+// ✅ FIX: Load SimplePie from WordPress core
+if (!class_exists('SimplePie')) {
+    if (file_exists(ABSPATH . WPINC . '/class-simplepie.php')) {
+        require_once ABSPATH . WPINC . '/class-simplepie.php';
+    } elseif (file_exists(ABSPATH . WPINC . '/SimplePie/autoload.php')) {
+        require_once ABSPATH . WPINC . '/SimplePie/autoload.php';
+    }
+}
+
 class RSSFetcher {
+    // ... بقیه کد بدون تغییر
     private $timeout = 20;
     private $user_agent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 NextSafar/3.0';
     private $cutoff_ts = 0;

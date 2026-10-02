@@ -251,6 +251,12 @@ class NewsBatchSync {
             return ['status' => 'skipped', 'ai_used' => false];
         }
 
+        // ✅ FIX: Extract filter result before processing
+        $fr = $item['_filter_result'] ?? [];
+        $filter_score = (int) ($fr['score'] ?? 0);
+        $filter_decision = sanitize_text_field($fr['decision'] ?? 'review');
+        $filter_reason = sanitize_text_field($fr['reason'] ?? '');
+
         $processed = null;
         $ai_ok = false;
 
@@ -295,7 +301,7 @@ class NewsBatchSync {
             return ['status' => 'failed', 'ai_used' => false];
         }
 
-        // Save meta (NO categories)
+        // Save basic meta
         update_post_meta($post_id, '_ns_source_url', esc_url_raw($item['link'] ?? ''));
         update_post_meta($post_id, '_ns_source_name', sanitize_text_field($item['source_name'] ?? ''));
         update_post_meta($post_id, '_ns_source_group', sanitize_text_field($item['source_group'] ?? ''));
@@ -303,6 +309,11 @@ class NewsBatchSync {
         update_post_meta($post_id, '_ns_fetch_type', sanitize_text_field($item['fetch_type'] ?? 'unknown'));
         update_post_meta($post_id, '_ns_ai_used', $ai_ok ? '1' : '0');
         update_post_meta($post_id, '_ns_fetched_at', current_time('mysql'));
+
+        // ✅ FIX: Save filter meta data
+        update_post_meta($post_id, '_ns_filter_score',    $filter_score);
+        update_post_meta($post_id, '_ns_filter_decision', $filter_decision);
+        update_post_meta($post_id, '_ns_filter_reason',   $filter_reason);
 
         if ($post_status === 'draft') {
             update_post_meta($post_id, '_ns_needs_rewrite', '1');

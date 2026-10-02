@@ -275,33 +275,48 @@ class ImageManager {
        ✅ Attempt 1: With browser headers (prevent 403 Forbidden)
        ✅ Attempt 2: Simple download_url
        ======================================================================== */
-    private static function download_image(string $url) {
-        $response = wp_remote_get($url, [
-            'timeout'     => 30,
-            'redirection' => 5,
-            'sslverify'   => false,
-            'headers'     => [
-                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                'Referer'    => 'https://www.google.com/',
-                'Accept'     => 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
-            ],
-        ]);
-
-        if (!is_wp_error($response) && (int) wp_remote_retrieve_response_code($response) === 200) {
-            $body = wp_remote_retrieve_body($response);
-
-            if (!empty($body)) {
-                $tmp = wp_tempnam($url);
-
-                if ($tmp) {
-                    file_put_contents($tmp, $body);
-                    return $tmp;
+        private static function download_image(string $url) {
+            // ✅ FIX 1: Validate URL first
+            if (empty($url) || !filter_var($url, FILTER_VALIDATE_URL)) {
+                return new \WP_Error('invalid_url', 'Invalid image URL');
+            }
+            
+            // ✅ FIX 2: Skip known broken domains
+            $skip_domains = ['example.com', 'broken-domain.com'];
+            foreach ($skip_domains as $domain) {
+                if (stripos($url, $domain) !== false) {
+                    return new \WP_Error('skipped_domain', 'Skipped known broken domain');
                 }
             }
-        }
 
-        return download_url($url, 30);
-    }
+            // ✅ FIX 3: Increase timeout to 60 seconds
+            $response = wp_remote_get($url, [
+                'timeout'     => 60,  // Increased from 30 to 60
+                'redirection' => 5,
+                'sslverify'   => false,
+                'headers'     => [
+                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                    'Referer'    => 'https://www.google.com/',
+                    'Accept'     => 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+                ],
+            ]);
+
+            if (!is_wp_error($response) && (int) wp_remote_retrieve_response_code($response) === 200) {
+                $body = wp_remote_retrieve_body($response);
+
+                if (!empty($body)) {
+                    $tmp = wp_tempnam($url);
+
+                    if ($tmp) {
+                        file_put_contents($tmp, $body);
+                        return $tmp;
+                    }
+                }
+            }
+
+            // ✅ FIX 4: Fallback to download_url with increased timeout
+            return download_url($url, 60);  // Increased from 30 to 60
+        }
 
     /* ========================================================================
        Extract Filename from URL

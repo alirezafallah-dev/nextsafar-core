@@ -27,8 +27,8 @@ class Menu {
         // 1. Smart News Settings
         // ═══════════════════════════════════════════════════════════
         add_menu_page(
-            'تنظیمات اخبار هوشمند',
-            'تنظیمات اخبار هوشمند',
+            'اخبار هوشمند',
+            'اخبار هوشمند',
             'manage_options',
             'nextsafar-news',
             [SyncPage::class, 'render_sync_page'],
@@ -67,8 +67,8 @@ class Menu {
         // 2. Smart Post Generator
         // ═══════════════════════════════════════════════════════════
         add_menu_page(
-            'تولید پست هوشمند',
-            'تولید پست هوشمند',
+            'پست هوشمند',
+            'پست هوشمند',
             'manage_options',
             'nextsafar-post-generator',
             [PostGenerator::class, 'render_page'],
@@ -87,7 +87,7 @@ class Menu {
         
         add_submenu_page(
             'nextsafar-post-generator',
-            'تنظیمات تولید پست هوشمند',
+            'تنظیمات پست هوشمند',
             'تنظیمات',
             'manage_options',
             'nextsafar-post-generator-settings',

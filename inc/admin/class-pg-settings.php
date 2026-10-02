@@ -42,7 +42,7 @@ class PgSettings {
         // ✅ منوی والد مستقل (حتماً نمایش داده می‌شه)
         add_menu_page(
             'NextSafar PostgreSQL',
-            '🐘 PostgreSQL',
+            'PostgreSQL',
             'manage_options',
             self::MENU_SLUG,
             [__CLASS__, 'renderPage'],
@@ -54,7 +54,7 @@ class PgSettings {
         add_submenu_page(
             self::MENU_SLUG,
             'PostgreSQL Settings',
-            '⚙️ Settings',
+            'Settings',
             'manage_options',
             self::MENU_SLUG,
             [__CLASS__, 'renderPage']
@@ -64,7 +64,7 @@ class PgSettings {
         add_submenu_page(
             self::MENU_SLUG,
             'Tables Status',
-            '📊 Tables',
+            'Tables',
             'manage_options',
             self::MENU_SLUG . '-tables',
             [__CLASS__, 'renderTablesPage']

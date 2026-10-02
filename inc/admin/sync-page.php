@@ -217,7 +217,7 @@ class SyncPage {
         </style>
 
         <div class="wrap nextsafar-sync-page">
-            <h1>تنظیمات اخبار هوشمند</h1>
+            <h1>اخبار هوشمند</h1>
 
             <!-- General Stats -->
             <div class="ns-card">

@@ -34,7 +34,7 @@ class Settings {
             update_option('nextsafar_news_max_ai_review_per_run', absint($_POST['max_ai_review_per_run'] ?? 2));
             update_option('nextsafar_news_time_window_hours', absint($_POST['time_window_hours'] ?? 24));
 
-            echo '<div class="notice notice-success is-dismissible"><p>✅ تنظیمات اخبار با موفقیت ذخیره شد.</p></div>';
+            echo '<div class="notice notice-success is-dismissible"><p>✅ اخبار با موفقیت ذخیره شد.</p></div>';
 
             $news_auto = isset($_POST['news_auto']) ? '1' : '0';
             $sync_hours = $hours;

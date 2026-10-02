@@ -147,43 +147,70 @@ class TravelNewsMetaBox {
         $score = get_post_meta($post->ID, '_ns_filter_score', true);
         $decision = get_post_meta($post->ID, '_ns_filter_decision', true);
         $reason = get_post_meta($post->ID, '_ns_filter_reason', true);
+
+        // ✅ FIX: If score is empty, try to re-analyze from original content
+        if ($score === '' || $score === false) {
+            $original_content = get_post_meta($post->ID, '_ns_original_content', true);
+            $original_title = get_post_meta($post->ID, '_ns_original_title', true);
+
+            if (!empty($original_content) || !empty($original_title)) {
+                try {
+                    $filter = new \NextSafar\API\NewsFilter();
+                    $item = [
+                        'title' => $original_title ?: $post->post_title,
+                        'content' => $original_content ?: $post->post_content,
+                    ];
+                    $result = $filter->analyze_item($item);
+                    $score = $result['score'] ?? 0;
+                    $decision = $result['decision'] ?? 'review';
+                    $reason = $result['reason'] ?? '';
+
+                    // Save for future use
+                    update_post_meta($post->ID, '_ns_filter_score', (int) $score);
+                    update_post_meta($post->ID, '_ns_filter_decision', sanitize_text_field($decision));
+                    update_post_meta($post->ID, '_ns_filter_reason', sanitize_text_field($reason));
+                } catch (\Throwable $e) {
+                    error_log('MetaBox re-analysis failed: ' . $e->getMessage());
+                }
+            }
+        }
+
+        // Ensure score is numeric
+        $score = (int) $score;
         ?>
         <div class="ns-filter-metabox" style="padding:10px;">
             <p>
                 <strong>📊 امتیاز گردشگری:</strong><br>
                 <span style="font-size:24px;font-weight:bold;color:<?= $score >= 0 ? '#00a32a' : '#d63638'; ?>;">
-                    <?= (int) $score; ?>
+                    <?= $score; ?>
                 </span>
             </p>
-
             <p>
                 <strong>✅ تصمیم فیلتر:</strong><br>
                 <?php
                 $decision_labels = [
                     'publish' => '🟢 انتشار مستقیم',
                     'draft' => '🟡 پیش‌نویس',
+                    'review' => '🔵 نیاز به بررسی',
                     'delete' => '🔴 حذف شده',
                 ];
-
                 echo $decision_labels[$decision] ?? 'نامشخص';
                 ?>
             </p>
-
             <?php if ($reason): ?>
-                <p>
-                    <strong>📝 دلیل:</strong><br>
-                    <small style="color:#666;"><?= esc_html($reason); ?></small>
-                </p>
+            <p>
+                <strong>📝 دلیل:</strong><br>
+                <small style="color:#666;"><?= esc_html($reason); ?></small>
+            </p>
             <?php endif; ?>
         </div>
-
         <style>
-            .ns-filter-metabox p {
-                margin: 10px 0;
-                padding: 8px;
-                background: #f0f0f1;
-                border-radius: 4px;
-            }
+        .ns-filter-metabox p {
+            margin: 10px 0;
+            padding: 8px;
+            background: #f0f0f1;
+            border-radius: 4px;
+        }
         </style>
         <?php
     }
