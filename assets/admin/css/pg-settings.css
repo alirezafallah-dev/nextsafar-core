@@ -1,0 +1,128 @@
+/**
+ * NextSafar PostgreSQL Settings Styles
+ */
+
+.nextsafar-pg-settings {
+    max-width: 1200px;
+}
+
+.nextsafar-pg-settings h1 {
+    font-size: 28px;
+    margin-bottom: 10px;
+}
+
+.ns-pg-section {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    padding: 20px;
+    margin: 20px 0;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.ns-pg-section h2 {
+    margin-top: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.ns-pg-status-card {
+    margin: 20px 0;
+}
+
+.ns-pg-overall-status {
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.ns-pg-overall-status.status-ok {
+    background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+    border-left: 5px solid #4caf50;
+}
+
+.ns-pg-overall-status.status-error {
+    background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+    border-left: 5px solid #f44336;
+}
+
+.ns-pg-overall-status h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 20px;
+}
+
+.ns-pg-overall-status ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.ns-pg-overall-status li {
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.ns-pg-overall-status li:last-child {
+    border-bottom: none;
+}
+
+.ns-pg-overall-status .dashicons-yes {
+    color: #4caf50;
+}
+
+.ns-pg-overall-status .dashicons-no {
+    color: #f44336;
+}
+
+.ns-pg-result {
+    margin-top: 15px;
+}
+
+.ns-pg-result .notice {
+    margin: 0;
+}
+
+.ns-pg-result .notice p {
+    line-height: 1.8;
+}
+
+.ns-pg-migration-info {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 4px;
+    margin: 15px 0;
+    border-left: 4px solid #2196f3;
+}
+
+.ns-pg-migration-info code {
+    background: #fff;
+    padding: 2px 8px;
+    border: 1px solid #ddd;
+    border-radius: 3px;
+}
+
+.ns-pg-error {
+    color: #d63638;
+    background: #fcf0f1;
+    padding: 10px;
+    border-radius: 4px;
+    border-left: 4px solid #d63638;
+}
+
+table.widefat code {
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
+}
+
+.form-table input[type="text"],
+.form-table input[type="password"],
+.form-table input[type="number"] {
+    min-width: 300px;
+}

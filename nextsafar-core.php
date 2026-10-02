@@ -44,12 +44,26 @@ require_once NEXTSAFAR_PATH . 'inc/database/news-tables.php';
 require_once NEXTSAFAR_PATH . 'inc/database/ai-trip-table.php';
 
 // ═══════════════════════════════════════════════════════════
+// 3.5 POSTGRESQL DATABASE LAYER (Phase 1)
+// ═══════════════════════════════════════════════════════════
+if (file_exists(NEXTSAFAR_PATH . 'inc/database/class-postgresql-connection.php')) {
+    require_once NEXTSAFAR_PATH . 'inc/database/class-postgresql-connection.php';
+    require_once NEXTSAFAR_PATH . 'inc/database/class-pg-schema-builder.php';
+    require_once NEXTSAFAR_PATH . 'inc/database/class-pg-migration-manager.php';
+}
+
+// Admin settings for PostgreSQL
+if (is_admin() && file_exists(NEXTSAFAR_PATH . 'inc/admin/class-pg-settings.php')) {
+    require_once NEXTSAFAR_PATH . 'inc/admin/class-pg-settings.php';
+    \NextSafar\Admin\PgSettings::init();
+}
+
+// ═══════════════════════════════════════════════════════════
 // 4. GEO SYSTEM - Spatial data foundation (before Sync)
 // ═══════════════════════════════════════════════════════════
 require_once NEXTSAFAR_PATH . 'inc/sync/geo-schema.php';
 require_once NEXTSAFAR_PATH . 'inc/sync/geo-sync.php';
 require_once NEXTSAFAR_PATH . 'inc/sync/place-enrich-trait.php';
-require_once NEXTSAFAR_PATH . 'inc/sync/migrate-geo-meta.php';
 
 // ═══════════════════════════════════════════════════════════
 // 5. API CLIENTS - External service integrations
