@@ -544,17 +544,56 @@ class BookingEndpoints {
                 $passenger_id
             );
             
-            // Check if all required documents are now uploaded
-            $all_docs_uploaded = self::check_all_docs_uploaded(
+            // ✅ FIX: Get detailed document status instead of boolean
+            $docs_status = self::check_all_docs_uploaded(
                 $booking['id'],
                 $visa_post_id
             );
-            
-            // Update booking status if all documents uploaded
-            if ($all_docs_uploaded) {
+
+            // ✅ FIX: Only change status if ALL documents are complete
+            $status_changed = false;
+            if ($docs_status['complete'] && $booking['status'] === 'awaiting_documents') {
                 BookingTable::update_status($booking['id'], 'awaiting_payment');
                 $booking['status'] = 'awaiting_payment';
+                $status_changed = true;
+                
+                Logger::info('All documents uploaded, booking ready for payment', [
+                    'booking_id' => $booking['id'],
+                    'booking_code' => $booking['booking_code'],
+                    'total_docs' => $docs_status['total_uploaded'],
+                ]);
             }
+
+            Logger::info('Documents uploaded for booking', [
+                'booking_id'   => $booking['id'],
+                'passenger_id' => $passenger_id,
+                'uploaded'     => count($upload_result['success']),
+                'errors'       => count($upload_result['errors']),
+                'progress'     => $docs_status['progress'],
+                'complete'     => $docs_status['complete'],
+            ]);
+
+            return rest_ensure_response([
+                'ok'                => true,
+                'uploaded'          => count($upload_result['success']),
+                'errors'            => $upload_result['errors'],
+                'documents'         => $upload_result['success'],
+                
+                // ✅ NEW: Detailed document status for frontend
+                'docs_status'       => [
+                    'complete'         => $docs_status['complete'],
+                    'progress'         => $docs_status['progress'],
+                    'total_required'   => $docs_status['total_required'],
+                    'total_uploaded'   => $docs_status['total_uploaded'],
+                    'missing'          => $docs_status['missing'],
+                    'passengers'       => $docs_status['passengers_status'],
+                ],
+                
+                'all_docs_uploaded' => $docs_status['complete'],
+                'booking_status'    => $booking['status'],
+                'status_changed'    => $status_changed,
+                'next_step'         => $docs_status['complete'] ? 'payment' : 'upload_more',
+            ]);
             
             Logger::info('Documents uploaded for booking', [
                 'booking_id'   => $booking['id'],
@@ -583,28 +622,124 @@ class BookingEndpoints {
     /**
      * Check if all required documents are uploaded for a booking
      */
-    private static function check_all_docs_uploaded(int $booking_id, int $visa_post_id): bool {
+    private static function check_all_docs_uploaded(int $booking_id, int $visa_post_id): array {
         $required_docs = VisaValidator::get_required_documents($visa_post_id);
         
+        // If no documents required, booking is complete
         if (empty($required_docs)) {
-            return true;
+            return [
+                'complete' => true,
+                'progress' => 100,
+                'total_required' => 0,
+                'total_uploaded' => 0,
+                'missing' => [],
+                'passengers_status' => [],
+            ];
         }
         
         $passengers = BookingPassengerTable::get_by_booking($booking_id);
         
+        if (empty($passengers)) {
+            return [
+                'complete' => false,
+                'progress' => 0,
+                'total_required' => 0,
+                'total_uploaded' => 0,
+                'missing' => [],
+                'passengers_status' => [],
+            ];
+        }
+        
+        $total_required = 0;
+        $total_uploaded = 0;
+        $missing_docs = [];
+        $passengers_status = [];
+        
         foreach ($passengers as $passenger) {
+            // Get documents for this passenger (only verified or pending, NOT rejected)
             $docs = BookingDocumentTable::get_by_passenger($passenger['id']);
-            $uploaded_types = array_column($docs, 'document_type');
             
-            // Check if all required docs are uploaded for this passenger
-            foreach ($required_docs as $slug => $doc_info) {
-                if (!in_array($slug, $uploaded_types)) {
-                    return false;
+            // Filter out rejected documents (status = 'rejected' if we add this)
+            $valid_docs = array_filter($docs, function ($doc) {
+                $status = $doc['status'] ?? 'pending';
+                return $status !== 'rejected';
+            });
+            
+            $uploaded_types = array_column($valid_docs, 'document_type');
+            
+            // Get documents required for THIS passenger type (adult/child)
+            $passenger_required = self::get_docs_for_passenger_type(
+                $required_docs, 
+                $passenger['type']
+            );
+            
+            $passenger_missing = [];
+            
+            foreach ($passenger_required as $slug => $doc_info) {
+                $total_required++;
+                
+                if (in_array($slug, $uploaded_types)) {
+                    $total_uploaded++;
+                } else {
+                    $missing_docs[] = [
+                        'passenger_id' => (int) $passenger['id'],
+                        'passenger_name' => trim($passenger['first_name'] . ' ' . $passenger['last_name']),
+                        'passenger_type' => $passenger['type'],
+                        'doc_slug' => $slug,
+                        'doc_label' => $doc_info['label'] ?? $slug,
+                    ];
+                    $passenger_missing[] = $slug;
                 }
+            }
+            
+            $passengers_status[] = [
+                'passenger_id' => (int) $passenger['id'],
+                'passenger_name' => trim($passenger['first_name'] . ' ' . $passenger['last_name']),
+                'passenger_type' => $passenger['type'],
+                'required_count' => count($passenger_required),
+                'uploaded_count' => count($passenger_required) - count($passenger_missing),
+                'missing_docs' => $passenger_missing,
+                'complete' => empty($passenger_missing),
+            ];
+        }
+        
+        $progress = $total_required > 0 
+            ? (int) round(($total_uploaded / $total_required) * 100) 
+            : 0;
+        
+        return [
+            'complete' => empty($missing_docs),
+            'progress' => $progress,
+            'total_required' => $total_required,
+            'total_uploaded' => $total_uploaded,
+            'missing' => $missing_docs,
+            'passengers_status' => $passengers_status,
+        ];
+    }
+
+    /**
+     * Get required documents based on passenger type
+     */
+    private static function get_docs_for_passenger_type(array $required_docs, string $passenger_type): array {
+        $filtered = [];
+        
+        foreach ($required_docs as $slug => $doc_info) {
+            // Get applicable passenger types for this document
+            // Default: applies to all passengers
+            $applies_to = $doc_info['applies_to'] ?? ['adult', 'child'];
+            
+            // Normalize to array
+            if (is_string($applies_to)) {
+                $applies_to = [$applies_to];
+            }
+            
+            // Check if this document applies to current passenger type
+            if (in_array($passenger_type, $applies_to, true)) {
+                $filtered[$slug] = $doc_info;
             }
         }
         
-        return true;
+        return $filtered;
     }
     
     // ═══════════════════════════════════════════════════════════
@@ -661,6 +796,15 @@ class BookingEndpoints {
                     'passenger_info' => $passenger_info,
                 ],
                 'passengers' => $formatted_passengers,
+
+                // ✅ NEW: Documents status summary
+                'docs_status' => [
+                    'complete'       => $docs_status['complete'],
+                    'progress'       => $docs_status['progress'],
+                    'total_required' => $docs_status['total_required'],
+                    'total_uploaded' => $docs_status['total_uploaded'],
+                    'missing'        => $docs_status['missing'],
+                ],
             ]);
             
         } catch (\Throwable $e) {
@@ -750,6 +894,13 @@ class BookingEndpoints {
         try {
             $booking_code = sanitize_text_field($request->get_param('code'));
             
+            // ✅ NEW: Get cancellation reason from request
+            $reason = sanitize_text_field(
+                $request->get_param('reason') 
+                ?? $request->get_body_params()['reason'] 
+                ?? ''
+            );
+            
             $booking = BookingTable::find_by_code($booking_code);
             
             if (!$booking) {
@@ -758,18 +909,56 @@ class BookingEndpoints {
                 );
             }
             
-            // Cancel the booking
-            $result = VisaBookingAdapter::cancel_booking($booking['id']);
+            // ✅ NEW: Security check - only booking owner or admin can cancel
+            if (!current_user_can('manage_options')) {
+                $current_user_id = get_current_user_id();
+                
+                if ($current_user_id > 0 && (int) $booking['user_id'] !== $current_user_id) {
+                    return ErrorHandler::to_response(
+                        ErrorHandler::forbidden('شما فقط می‌توانید رزروهای خود را لغو کنید.')
+                    );
+                }
+                
+                // For guest bookings, verify phone number
+                if ($current_user_id === 0) {
+                    $passenger_info = is_string($booking['passenger_info']) 
+                        ? json_decode($booking['passenger_info'], true) 
+                        : $booking['passenger_info'];
+                    
+                    $request_phone = sanitize_text_field($request->get_param('phone') ?? '');
+                    $booking_phone = $passenger_info['main_phone'] ?? '';
+                    
+                    if (empty($request_phone) || $request_phone !== $booking_phone) {
+                        return ErrorHandler::to_response(
+                            ErrorHandler::error(
+                                'phone_mismatch',
+                                'شماره تلفن وارد شده با رزرو مطابقت ندارد.',
+                                403
+                            )
+                        );
+                    }
+                }
+            }
+            
+            // ✅ Cancel the booking with payment check
+            $result = VisaBookingAdapter::cancel_booking(
+                $booking['id'], 
+                $reason,
+                current_user_can('manage_options')
+            );
             
             if (is_wp_error($result)) {
                 return ErrorHandler::to_response($result);
             }
             
             return rest_ensure_response([
-                'ok'           => true,
-                'booking_code' => $booking_code,
-                'status'       => 'cancelled',
-                'message'      => 'رزرو شما با موفقیت لغو شد.',
+                'ok'            => true,
+                'booking_code'  => $booking_code,
+                'status'        => 'cancelled',
+                'needs_refund'  => $result['needs_refund'],
+                'refund_status' => $result['refund_status'],
+                'refund_amount' => $result['refund_amount'],
+                'message'       => $result['message'],
             ]);
             
         } catch (\Throwable $e) {

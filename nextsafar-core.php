@@ -278,6 +278,7 @@ require_once NEXTSAFAR_PATH . 'inc/booking/class-visa-price-calculator.php';
 require_once NEXTSAFAR_PATH . 'inc/booking/class-visa-validator.php';
 require_once NEXTSAFAR_PATH . 'inc/booking/class-booking-file-uploader.php';
 require_once NEXTSAFAR_PATH . 'inc/booking/adapters/class-visa-booking-adapter.php';
+require_once NEXTSAFAR_PATH . 'inc/booking/class-currency-manager.php';
 
 // ═══════════════════════════════════════════════════════════
 // 2.10 BOOKING REST API ENDPOINTS
@@ -320,6 +321,7 @@ add_action('plugins_loaded', function () {
     \NextSafar\API\MapEndpoint::init();
     \NextSafar\MetaBoxes\GeoCoordsField::init();
     \NextSafar\API\PostSync::init();
+    \NextSafar\Booking\CurrencyManager::init();
 }, 10);
 
 // ═══════════════════════════════════════════════════════════

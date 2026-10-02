@@ -12,6 +12,7 @@
 namespace NextSafar\Booking;
 
 use NextSafar\Core\Logger;
+use NextSafar\Booking\CurrencyManager;
 
 if (!defined('ABSPATH')) exit;
 
@@ -107,25 +108,10 @@ class VisaPriceCalculator {
     
     /**
      * Get exchange rate for a currency
-     * 
-     * @param string $currency Currency code (aed, usd, eur, irr, omn)
-     * @return float Exchange rate (1 unit = X Rials)
      */
     public static function get_exchange_rate(string $currency): float {
-        $currency_code = strtolower($currency);
-        
-        // Convert Persian to code if needed
-        if (isset(self::CURRENCY_MAP[$currency])) {
-            $currency_code = self::CURRENCY_MAP[$currency];
-        }
-        
-        $rate = get_option("visa_rate_{$currency_code}", 0);
-        
-        if ($rate === false || $rate === '') {
-            $rate = 0;
-        }
-        
-        return (float) $rate;
+        // ✅ Delegate to CurrencyManager
+        return CurrencyManager::get_rate($currency);
     }
     
     /**
@@ -166,18 +152,26 @@ class VisaPriceCalculator {
         $type        = $visa_price['type'] ?? '';
         $duration    = $visa_price['duration'] ?? '';
         
-        // Get exchange rate
+        // ✅ Get exchange rate via centralized Exchange system
         $rate = self::get_exchange_rate($currency);
-        
-        if ($rate <= 0 && $currency !== 'ریال' && $currency !== 'IRR') {
+
+        // ✅ FIX: Better error message with admin guidance
+        if ($rate <= 0 && strtoupper($currency) !== 'IRR' && $currency !== 'ریال') {
+            $currency_code = \NextSafar\Admin\Exchange::normalize_code($currency);
+            
             Logger::warning('Exchange rate not set', [
-                'currency' => $currency,
-                'visa_id'  => $visa_post_id,
+                'currency'      => $currency,
+                'currency_code' => $currency_code,
+                'visa_id'       => $visa_post_id,
             ]);
             
             return new \WP_Error(
                 'no_exchange_rate',
-                sprintf('نرخ ارز برای %s تنظیم نشده است. لطفاً با پشتیبانی تماس بگیرید.', $currency),
+                sprintf(
+                    'نرخ ارز %s (%s) تنظیم نشده است. لطفاً از بخش «صرافی» در پنل ادمین نرخ را به‌روزرسانی کنید یا با پشتیبانی تماس بگیرید.',
+                    $currency,
+                    $currency_code
+                ),
                 ['status' => 503]
             );
         }

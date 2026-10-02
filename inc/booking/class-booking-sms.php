@@ -215,6 +215,35 @@ class BookingSms {
     }
     
     /**
+     * Send cancellation notification SMS
+     */
+    public static function send_cancellation_notification(
+        string $phone, 
+        string $booking_code, 
+        bool $has_refund = false,
+        float $refund_amount = 0
+    ): bool {
+        if (empty($phone)) {
+            return false;
+        }
+        
+        if ($has_refund) {
+            $message = sprintf(
+                "کاربر گرامی،\nرزرو %s لغو شد.\nمبلغ %s ریال به زودی به حساب شما بازگردانده می‌شود.\nنکست‌سفر",
+                $booking_code,
+                number_format($refund_amount)
+            );
+        } else {
+            $message = sprintf(
+                "کاربر گرامی،\nرزرو %s با موفقیت لغو شد.\nدر صورت نیاز، می‌توانید مجدداً رزرو انجام دهید.\nنکست‌سفر",
+                $booking_code
+            );
+        }
+        
+        return self::send($phone, $message);
+    }
+
+    /**
      * Update SMS settings
      */
     public static function update_settings(array $settings): void {

@@ -421,31 +421,80 @@ class VisaValidator {
     
     /**
      * Get required documents for a visa
-     * 
-     * @param int $visa_post_id
-     * @return array Array of required document slugs
      */
     public static function get_required_documents(int $visa_post_id): array {
+        // Get documents from visa post meta
         $visa_docs = get_post_meta($visa_post_id, '_visa_docs', true);
         
         if (!is_array($visa_docs)) {
-            return [];
+            $visa_docs = [];
         }
         
-        $required = [];
+        // Default documents structure with passenger type filtering
+        $default_docs = [
+            'passport' => [
+                'label' => 'تصویر صفحه اول پاسپورت',
+                'required' => true,
+                'applies_to' => ['adult', 'child'],
+            ],
+            'photo' => [
+                'label' => 'عکس پرسنلی ۳×۴',
+                'required' => true,
+                'applies_to' => ['adult', 'child'],
+            ],
+            'national_id_card' => [
+                'label' => 'تصویر کارت ملی',
+                'required' => true,
+                'applies_to' => ['adult'],
+            ],
+            'birth_certificate' => [
+                'label' => 'تصویر شناسنامه',
+                'required' => true,
+                'applies_to' => ['child'],
+            ],
+            'job_letter' => [
+                'label' => 'گواهی اشتغال به کار',
+                'required' => false,
+                'applies_to' => ['adult'],
+            ],
+            'bank_statement' => [
+                'label' => 'پرینت حساب بانکی',
+                'required' => false,
+                'applies_to' => ['adult'],
+            ],
+        ];
         
-        foreach ($visa_docs as $label => $config) {
-            if (!empty($config['checked'])) {
-                $slug = self::doc_slug($label);
-                $required[$slug] = [
-                    'label' => $label,
-                    'slug'  => $slug,
-                    'note'  => $config['text'] ?? '',
+        $required_docs = [];
+        
+        foreach ($default_docs as $slug => $info) {
+            // Check if this document is enabled in visa settings
+            $doc_setting = $visa_docs[$slug] ?? null;
+            
+            if ($doc_setting === null) {
+                // Not configured, use default only if required
+                if ($info['required']) {
+                    $required_docs[$slug] = $info;
+                }
+                continue;
+            }
+            
+            $is_checked = (bool) ($doc_setting['checked'] ?? false);
+            
+            if ($is_checked) {
+                $required_docs[$slug] = [
+                    'label' => !empty($doc_setting['text']) 
+                        ? $doc_setting['text'] 
+                        : $info['label'],
+                    'required' => $info['required'],
+                    'applies_to' => $info['applies_to'],
                 ];
             }
         }
         
-        return $required;
+        /**
+         * Filter hook for other plugins to modify required documents
+         */
+        return apply_filters('nextsafar_visa_required_docs', $required_docs, $visa_post_id);
     }
     
     /**

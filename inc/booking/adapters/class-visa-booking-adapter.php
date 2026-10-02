@@ -134,7 +134,7 @@ class VisaBookingAdapter {
             'user_id'          => $user_id,
             'booking_type'     => self::TYPE,
             'item_id'          => (int) $price_data['visa_post_id'],
-            'status'           => 'awaiting_payment',
+            'status'           => 'awaiting_documents', 
             'total_price'      => $price_data['total_price_rial'],
             'currency'         => 'IRR',
             'passenger_count'  => $price_data['total_passengers'],
@@ -438,42 +438,122 @@ class VisaBookingAdapter {
         return true;
     }
     
+
     /**
-     * Cancel a booking
-     * 
-     * @param int $booking_id
-     * @return bool|\WP_Error
+     * Cancel a booking with full payment check
      */
-    public static function cancel_booking(int $booking_id): bool|\WP_Error {
+    public static function cancel_booking(int $booking_id, string $reason = '', bool $by_admin = false): array|\WP_Error {
         $booking = BookingTable::find($booking_id);
         
         if (!$booking) {
             return new \WP_Error('not_found', 'رزرو یافت نشد.', ['status' => 404]);
         }
         
-        // Check if booking can be cancelled
-        $cancellable_statuses = ['pending', 'awaiting_payment', 'processing'];
+        // ✅ FIX: Complete list of cancellable statuses
+        $cancellable_statuses = [
+            'pending',            // در انتظار
+            'awaiting_documents', // در انتظار مدارک
+            'awaiting_payment',   // در انتظار پرداخت
+            'paid',               // پرداخت شده (نیاز به بازپرداخت)
+        ];
         
-        if (!in_array($booking['status'], $cancellable_statuses)) {
+        if (!in_array($booking['status'], $cancellable_statuses, true)) {
             return new \WP_Error(
                 'cannot_cancel',
-                'این رزرو در وضعیت فعلی قابل لغو نیست.',
+                'این رزرو در وضعیت فعلی قابل لغو نیست. فقط رزروهایی که هنوز در حال پردازش نشده‌اند قابل لغو هستند.',
                 ['status' => 400]
             );
         }
         
-        // Update status
-        $updated = BookingTable::update_status($booking_id, 'cancelled');
+        // ✅ NEW: Check for successful payments
+        $payments = \NextSafar\Payment\PaymentTable::find_by_booking($booking_id);
+        $successful_payments = array_filter($payments, function ($p) {
+            return $p['status'] === 'success';
+        });
+        
+        $needs_refund = !empty($successful_payments);
+        $refund_status = 'not_needed';
+        $total_refund_amount = 0;
+        
+        if ($needs_refund) {
+            // Calculate total refund amount
+            foreach ($successful_payments as $payment) {
+                $total_refund_amount += (float) $payment['amount'];
+            }
+            
+            // ✅ Mark payments for refund
+            foreach ($successful_payments as $payment) {
+                \NextSafar\Payment\PaymentTable::update_status($payment['id'], 'refunded', [
+                    'callback_data' => [
+                        'refund_reason' => $reason ?: 'لغو رزرو توسط کاربر',
+                        'refunded_at'   => current_time('mysql'),
+                        'refunded_by'   => $by_admin ? 'admin' : 'user',
+                        'booking_code'  => $booking['booking_code'],
+                    ],
+                ]);
+            }
+            
+            $refund_status = 'initiated';
+        }
+        
+        // ✅ Update booking status
+        $updated = BookingTable::update($booking_id, [
+            'status' => 'cancelled',
+            'notes'  => sprintf(
+                "لغو شده در %s | دلیل: %s | توسط: %s | بازپرداخت: %s",
+                current_time('mysql'),
+                $reason ?: 'ذکر نشده',
+                $by_admin ? 'ادمین' : 'کاربر',
+                $needs_refund ? number_format($total_refund_amount) . ' ریال' : 'ندارد'
+            ),
+        ]);
         
         if (!$updated) {
             return new \WP_Error('db_error', 'خطا در لغو رزرو.', ['status' => 500]);
         }
         
+        // ✅ NEW: Send SMS notification
+        $passenger_info = is_string($booking['passenger_info']) 
+            ? json_decode($booking['passenger_info'], true) 
+            : $booking['passenger_info'];
+        
+        $phone = $passenger_info['main_phone'] ?? '';
+        
+        if (!empty($phone)) {
+            BookingSms::send_cancellation_notification(
+                $phone, 
+                $booking['booking_code'],
+                $needs_refund,
+                $total_refund_amount
+            );
+        }
+        
+        // ✅ NEW: Clean up uploaded documents (optional, only if not paid)
+        if (!$needs_refund) {
+            BookingFileUploader::delete_booking_documents($booking_id, true);
+        }
+        
         Logger::info('Visa booking cancelled', [
-            'booking_id' => $booking_id,
+            'booking_id'      => $booking_id,
+            'booking_code'    => $booking['booking_code'],
+            'reason'          => $reason,
+            'by_admin'        => $by_admin,
+            'needs_refund'    => $needs_refund,
+            'refund_amount'   => $total_refund_amount,
+            'previous_status' => $booking['status'],
         ]);
         
-        return true;
+        return [
+            'booking_id'      => $booking_id,
+            'booking_code'    => $booking['booking_code'],
+            'status'          => 'cancelled',
+            'needs_refund'    => $needs_refund,
+            'refund_status'   => $refund_status,
+            'refund_amount'   => $total_refund_amount,
+            'message'         => $needs_refund 
+                ? 'رزرو لغو شد. مبلغ پرداختی به زودی به حساب شما بازگردانده می‌شود.'
+                : 'رزرو با موفقیت لغو شد.',
+        ];
     }
     
     /**

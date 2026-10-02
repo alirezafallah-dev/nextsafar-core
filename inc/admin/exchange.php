@@ -16,10 +16,89 @@ class Exchange {
     const CACHE_DURATION = HOUR_IN_SECONDS;
     const LEGACY_API_KEY = 'visa_brs_api_key';
 
-    public static function get_rate(string $currency_code): float {
-        $rates = self::get_exchange_rates();
+    /**
+     * Persian currency name to code mapping
+     * 
+     * ✅ NEW: Supports Persian currency names from visa metabox
+     */
+    const PERSIAN_TO_CODE = [
+        'دلار'        => 'USD',
+        'دلار آمریکا' => 'USD',
+        'یورو'        => 'EUR',
+        'پوند'        => 'GBP',
+        'پوند انگلیس' => 'GBP',
+        'درهم'        => 'AED',
+        'درهم امارات' => 'AED',
+        'ریال عمان'   => 'OMR',
+        'دینار عراق'  => 'IQD',
+        'روبل'        => 'RUB',
+        'یوان'        => 'CNY',
+        'یوان چین'    => 'CNY',
+        'لیر'         => 'TRY',
+        'لیر ترکیه'   => 'TRY',
+        'بات'         => 'THB',
+        'بات تایلند'  => 'THB',
+        'رینگیت'      => 'MYR',
+        'ریال قطر'    => 'QAR',
+        'ریال'        => 'IRR',
+    ];
 
-        return floatval($rates[strtoupper($currency_code)] ?? 0);
+    /**
+     * Normalize currency input to uppercase code
+     * 
+     * ✅ NEW METHOD
+     * Accepts both codes (USD, aed) and Persian names (دلار, درهم)
+     * 
+     * @param string $currency Currency code or Persian name
+     * @return string Uppercase currency code
+     */
+    public static function normalize_code(string $currency): string {
+        $currency = trim($currency);
+        
+        // Already a valid code? (3 letters)
+        if (preg_match('/^[A-Za-z]{3}$/', $currency)) {
+            return strtoupper($currency);
+        }
+        
+        // Try Persian name matching
+        foreach (self::PERSIAN_TO_CODE as $persian => $code) {
+            if (mb_strpos($currency, $persian) !== false) {
+                return $code;
+            }
+        }
+        
+        // Return as-is (uppercased)
+        return strtoupper($currency);
+    }
+
+    /**
+     * Get rate for visa system
+     * 
+     * ✅ NEW METHOD: Bridge between VisaPriceCalculator and Exchange
+     * Supports Persian currency names used in visa metabox
+     * 
+     * @param string $currency Currency code or Persian name (e.g., 'درهم', 'AED')
+     * @return float Rate to Rial (0 if not found)
+     */
+    public static function get_rate_for_visa(string $currency): float {
+        $code = self::normalize_code($currency);
+        
+        // IRR is always 1:1
+        if ($code === 'IRR') {
+            return 1.0;
+        }
+        
+        $rate = self::get_rate($code);
+        
+        if ($rate <= 0) {
+            error_log('[NEXTSAFAR_EXCHANGE] ⚠️ Rate not found for: ' . $currency . ' (code: ' . $code . ')');
+        }
+        
+        return $rate;
+    }
+
+    public static function get_exchange_rate(string $currency): float {
+        return \NextSafar\Admin\Exchange::get_rate_for_visa($currency);
     }
 
     public static function convert_to_rial(float $amount, string $currency_code): float {
